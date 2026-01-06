@@ -24,11 +24,11 @@
 ---
 
 ## フェーズ1：セキュリティ & 編集権限（1〜2日）
-- [ ] 匿名Authの自動ログイン（ログイン操作なし）
-- [ ] Cloud Functions: `verifyPin` 実装
-- [ ] Cloud Functions: `rotatePin` / `revokeEditSession` 実装
-- [ ] Firestoreルール適用（編集はセッション保持者のみ）
-- [ ] `pinHash` をprivate領域へ分離（クライアントread禁止）
+- [x] 匿名Authの自動ログイン（ログイン操作なし）
+- [x] Cloud Functions: `verifyPin` 実装
+- [x] Cloud Functions: `rotatePin` / `revokeEditSession` 実装
+- [x] Firestoreルール適用（編集はセッション保持者のみ）
+- [x] `pinHash` をprivate領域へ分離（クライアントread禁止）
 
 受入:
 - PIN未入力だと編集できない

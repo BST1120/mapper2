@@ -1,0 +1,80 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function authed() {
+      return request.auth != null;
+    }
+
+    function sessionPath(tenantId) {
+      return /databases/$(database)/documents/tenants/$(tenantId)/editSessions/$(request.auth.uid);
+    }
+
+    function hasValidSession(tenantId) {
+      return authed()
+        && exists(sessionPath(tenantId))
+        && get(sessionPath(tenantId)).data.expiresAt > request.time
+        && get(sessionPath(tenantId)).data.sessionId is string;
+    }
+
+    function dayStatePath(tenantId, date) {
+      return /databases/$(database)/documents/tenants/$(tenantId)/days/$(date)/state;
+    }
+
+    function isUnlocked(tenantId, date) {
+      // state docがない場合は「未ロック」として扱う（MVP）
+      return !exists(dayStatePath(tenantId, date))
+        || get(dayStatePath(tenantId, date)).data.editLocked == false;
+    }
+
+    match /tenants/{tenantId} {
+      allow read: if authed();
+      allow create, update, delete: if false;
+
+      match /private/{docId} {
+        // pinHashなどを置く領域。クライアントには読ませない。
+        allow read, write: if false;
+      }
+
+      match /areas/{areaId} {
+        allow read: if authed();
+        allow write: if hasValidSession(tenantId);
+      }
+
+      match /staff/{staffId} {
+        allow read: if authed();
+        allow write: if hasValidSession(tenantId);
+      }
+
+      match /editSessions/{uid} {
+        allow read: if authed() && request.auth.uid == uid;
+        allow write: if false; // Functions(Admin SDK)のみ
+      }
+
+      match /days/{date} {
+        allow read: if authed();
+
+        match /state {
+          allow read: if authed();
+          allow write: if hasValidSession(tenantId);
+        }
+
+        match /shifts/{staffId} {
+          allow read: if authed();
+          allow write: if hasValidSession(tenantId);
+        }
+
+        match /assignments/{staffId} {
+          allow read: if authed();
+          allow write: if hasValidSession(tenantId) && isUnlocked(tenantId, date);
+        }
+
+        match /auditLogs/{logId} {
+          allow read: if authed();
+          allow create: if hasValidSession(tenantId);
+          allow update, delete: if false;
+        }
+      }
+    }
+  }
+}
+
