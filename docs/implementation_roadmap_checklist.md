@@ -11,11 +11,11 @@
 ---
 
 ## フェーズ0：準備（半日〜1日）
-- [ ] リポジトリ初期化（Next.js + TypeScript）
+- [x] リポジトリ初期化（Next.js + TypeScript）
 - [ ] UI基盤（ルーティング、レイアウト、メニュー、iPad横向き前提のレスポンシブ）
-- [ ] 環境変数設計（Firebase設定、tenantIdの扱い）
+- [x] 環境変数設計（Firebase設定、tenantIdの扱い）
 - [ ] Firebaseプロジェクト準備（Firestore / Auth(匿名) / Functions / Hosting or Vercel）
-- [ ] ローカル開発手順をREADMEに記載（起動、エミュレータ、デプロイ）
+- [x] ローカル開発手順をREADMEに記載（起動、エミュレータ、デプロイ）
 
 成果物:
 - `README.md` に「起動」「Firebase設定」「デプロイ」手順がある
