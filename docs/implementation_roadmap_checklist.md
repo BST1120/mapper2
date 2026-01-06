@@ -12,7 +12,7 @@
 
 ## フェーズ0：準備（半日〜1日）
 - [x] リポジトリ初期化（Next.js + TypeScript）
-- [ ] UI基盤（ルーティング、レイアウト、メニュー、iPad横向き前提のレスポンシブ）
+- [x] UI基盤（ルーティング、レイアウト、メニュー、iPad横向き前提のレスポンシブ）
 - [x] 環境変数設計（Firebase設定、tenantIdの扱い）
 - [ ] Firebaseプロジェクト準備（Firestore / Auth(匿名) / Functions / Hosting or Vercel）
 - [x] ローカル開発手順をREADMEに記載（起動、エミュレータ、デプロイ）
