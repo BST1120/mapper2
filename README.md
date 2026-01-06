@@ -33,6 +33,15 @@ cp .env.example .env.local
 - Authentication: **Anonymous（匿名）** を有効化
 - Firestore Database: 作成（開発中はテストモードでOK）
 
+### 編集（管理者）URLについて（完全無料運用）
+
+完全無料で運用するため、管理者の編集は **秘密URL** 方式にします。
+
+- 閲覧URL: `/{tenant}/mapper`
+- 管理者URL: `/{tenant}/admin/{editKey}/mapper`
+
+`editKey` は推測されにくいランダム文字列（例: 16文字以上）を設定し、管理者だけが知るように運用してください。
+
 ### 3) 開発サーバ起動
 
 First, run the development server:

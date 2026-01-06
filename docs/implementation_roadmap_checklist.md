@@ -14,7 +14,7 @@
 - [x] リポジトリ初期化（Next.js + TypeScript）
 - [x] UI基盤（ルーティング、レイアウト、メニュー、iPad横向き前提のレスポンシブ）
 - [x] 環境変数設計（Firebase設定、tenantIdの扱い）
-- [ ] Firebaseプロジェクト準備（Firestore / Auth(匿名) / Functions / Hosting or Vercel）
+- [ ] Firebaseプロジェクト準備（Firestore / Auth(匿名) / Hosting or Vercel）
 - [x] ローカル開発手順をREADMEに記載（起動、エミュレータ、デプロイ）
 
 成果物:
@@ -25,14 +25,12 @@
 
 ## フェーズ1：セキュリティ & 編集権限（1〜2日）
 - [x] 匿名Authの自動ログイン（ログイン操作なし）
-- [x] Cloud Functions: `verifyPin` 実装
-- [x] Cloud Functions: `rotatePin` / `revokeEditSession` 実装
-- [x] Firestoreルール適用（編集はセッション保持者のみ）
-- [x] `pinHash` をprivate領域へ分離（クライアントread禁止）
+- [x] 管理者URL（秘密URL）で編集モードを表示（UI制御）
+- [ ] Firestoreルール適用（最低限: 匿名Auth必須。完全無料のため厳密な編集制御は運用で担保）
 
 受入:
-- PIN未入力だと編集できない
-- PIN入力で編集できる（期限切れで再入力が必要）
+- 閲覧URLでは編集UIが出ない
+- 管理者用の秘密URLでは編集UIが出る
 
 ---
 

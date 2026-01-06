@@ -1,53 +1,23 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function authed() {
-      return request.auth != null;
-    }
-
-    function sessionPath(tenantId) {
-      return /databases/$(database)/documents/tenants/$(tenantId)/editSessions/$(request.auth.uid);
-    }
-
-    function hasValidSession(tenantId) {
-      return authed()
-        && exists(sessionPath(tenantId))
-        && get(sessionPath(tenantId)).data.expiresAt > request.time
-        && get(sessionPath(tenantId)).data.sessionId is string;
-    }
-
-    function dayStatePath(tenantId, date) {
-      return /databases/$(database)/documents/tenants/$(tenantId)/days/$(date)/state;
-    }
-
-    function isUnlocked(tenantId, date) {
-      // state docがない場合は「未ロック」として扱う（MVP）
-      return !exists(dayStatePath(tenantId, date))
-        || get(dayStatePath(tenantId, date)).data.editLocked == false;
-    }
+    // 完全無料（Functionsなし）運用のため、編集制御は「秘密URL（クライアント側）」で行う。
+    // Firestoreルールでは厳密な「管理者だけ編集」を担保できないため、
+    // ここでは最低限「匿名Authでのアクセス必須」に留める（MVP）。
+    function authed() { return request.auth != null; }
 
     match /tenants/{tenantId} {
       allow read: if authed();
-      allow create, update, delete: if false;
-
-      match /private/{docId} {
-        // pinHashなどを置く領域。クライアントには読ませない。
-        allow read, write: if false;
-      }
+      allow create, update, delete: if authed();
 
       match /areas/{areaId} {
         allow read: if authed();
-        allow write: if hasValidSession(tenantId);
+        allow write: if authed();
       }
 
       match /staff/{staffId} {
         allow read: if authed();
-        allow write: if hasValidSession(tenantId);
-      }
-
-      match /editSessions/{uid} {
-        allow read: if authed() && request.auth.uid == uid;
-        allow write: if false; // Functions(Admin SDK)のみ
+        allow write: if authed();
       }
 
       match /days/{date} {
@@ -55,23 +25,23 @@ service cloud.firestore {
 
         match /state {
           allow read: if authed();
-          allow write: if hasValidSession(tenantId);
+          allow write: if authed();
         }
 
         match /shifts/{staffId} {
           allow read: if authed();
-          allow write: if hasValidSession(tenantId);
+          allow write: if authed();
         }
 
         match /assignments/{staffId} {
           allow read: if authed();
-          allow write: if hasValidSession(tenantId) && isUnlocked(tenantId, date);
+          allow write: if authed();
         }
 
         match /auditLogs/{logId} {
           allow read: if authed();
-          allow create: if hasValidSession(tenantId);
-          allow update, delete: if false;
+          allow create: if authed();
+          allow update, delete: if authed();
         }
       }
     }
