@@ -1,4 +1,5 @@
 import { MapperGrid } from "./ui";
+import { MapperPageClient } from "./uiClient";
 
 export default function MapperPage() {
   return (
@@ -8,7 +9,7 @@ export default function MapperPage() {
         指定のグリッド配置（さる→…→ねずみ、園庭レイアウト）でエリアを表示します。
         ここは<strong>閲覧用URL</strong>です。編集は「秘密URL（管理者用URL）」側で行います（実装中）。
       </p>
-      <MapperGrid />
+      <MapperPageClient fallback={<MapperGrid />} />
     </div>
   );
 }
