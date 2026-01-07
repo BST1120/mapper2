@@ -1,6 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 import { MapperGrid } from "../../../mapper/ui";
 import { formatDateYYYYMMDD } from "@/lib/date/today";
@@ -9,7 +10,10 @@ import { useAreas, useAssignments, useDayState, useShifts, useStaff } from "@/li
 export function AdminMapperClient({ fallback }: { fallback: React.ReactNode }) {
   const params = useParams<{ tenant: string; editKey: string }>();
   const tenantId = params.tenant;
-  const date = formatDateYYYYMMDD(new Date());
+  const sp = useSearchParams();
+  const date = sp.get("date") && /^\d{4}-\d{2}-\d{2}$/.test(sp.get("date")!)
+    ? sp.get("date")!
+    : formatDateYYYYMMDD(new Date());
   const { areasById, error: areasError } = useAreas(tenantId);
   const { staffById, error: staffError } = useStaff(tenantId);
   const { assignmentsByStaffId, error: assnError } = useAssignments(tenantId, date);
