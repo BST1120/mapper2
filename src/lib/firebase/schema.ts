@@ -33,6 +33,15 @@ export type DayState = {
   lockedByUid?: string;
 };
 
+export type AuditLog = {
+  timestamp: unknown;
+  type: "move" | "lock" | "unlock";
+  staffId?: string;
+  fromAreaId?: string;
+  toAreaId?: string;
+  uid?: string;
+};
+
 export type Staff = {
   lastName: string;
   firstName: string;

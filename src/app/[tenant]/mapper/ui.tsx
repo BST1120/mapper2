@@ -4,7 +4,7 @@ import type { Area as AreaDoc } from "@/lib/firebase/schema";
 import type { Assignment, Staff } from "@/lib/firebase/schema";
 import { buildDisplayName } from "@/lib/staff/displayName";
 import { ensureAnonymousAuth } from "@/lib/firebase/client";
-import { assignmentDocRef, dayStateDocRef } from "@/lib/firebase/refs";
+import { assignmentDocRef, auditLogsColRef, dayStateDocRef } from "@/lib/firebase/refs";
 import {
   DndContext,
   DragOverlay,
@@ -17,7 +17,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { useMemo, useState } from "react";
-import { runTransaction, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { addDoc, runTransaction, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 
 type AreaSlot = { id: string; fallbackName: string; span?: number };
 
@@ -214,6 +214,7 @@ export function MapperGrid({
     setBanner(null);
     const expectedVersion = assignmentsByStaffId[staffId]?.version ?? 0;
     const ref = assignmentDocRef(tenantId, date, staffId);
+    const fromAreaId = assignmentsByStaffId[staffId]?.areaId ?? "free";
 
     try {
       await runTransaction(ref.firestore, async (tx) => {
@@ -238,6 +239,15 @@ export function MapperGrid({
           });
         }
       });
+
+      // Best-effort audit log (no need to block UI)
+      void addDoc(auditLogsColRef(tenantId, date), {
+        timestamp: serverTimestamp() as unknown,
+        type: "move",
+        staffId,
+        fromAreaId,
+        toAreaId,
+      });
     } catch (e: unknown) {
       if (e instanceof Error && e.message === "CONFLICT") {
         setBanner("競合: 他の端末が先に同じ職員を動かしました。最新の配置に更新しました。");
@@ -255,6 +265,11 @@ export function MapperGrid({
     await updateDoc(ref, {
       editLocked: next,
       lockedAt: serverTimestamp() as unknown,
+    });
+
+    void addDoc(auditLogsColRef(tenantId, date), {
+      timestamp: serverTimestamp() as unknown,
+      type: next ? "lock" : "unlock",
     });
   }
 

@@ -36,3 +36,7 @@ export function assignmentDocRef(tenantId: string, date: string, staffId: string
   return doc(getFirestoreDb(), "tenants", tenantId, "days", date, "assignments", staffId);
 }
 
+export function auditLogsColRef(tenantId: string, date: string) {
+  return collection(getFirestoreDb(), "tenants", tenantId, "days", date, "auditLogs");
+}
+

@@ -46,12 +46,12 @@
 
 ## フェーズ3：マッパー（コア機能）（2〜4日）
 - [x] マッパーUI（背景 + 6カラムグリッド配置 + 右サイド: フリー/休憩）
-- [ ] エリア内の職員自動整列（CSS Grid）
-- [ ] 編集ロック（state.editLocked のON/OFF）
-- [ ] D&D配置変更（Firestore transaction + version 競合検知）
-- [ ] 競合警告UI（同じ職員を同時に動かした時）
+- [x] エリア内の職員自動整列（CSS Grid）
+- [x] 編集ロック（state.editLocked のON/OFF）
+- [x] D&D配置変更（Firestore transaction + version 競合検知）
+- [x] 競合警告UI（同じ職員を同時に動かした時）
 - [ ] 勤務終了グレー表示（endAt経過で視覚変更）
-- [ ] 監査ログ記録（move/lock/unlock）
+- [x] 監査ログ記録（move/lock/unlock）
 
 受入:
 - 端末Aの移動が端末Bに反映
