@@ -6,6 +6,13 @@ export type Tenant = {
   updatedAt?: unknown;
 };
 
+export type ShiftType = {
+  code: string; // e.g. A, G1, D1
+  start: string; // HH:MM
+  end: string; // HH:MM
+  order: number;
+};
+
 export type AreaType =
   | "room"
   | "outdoor"
@@ -54,7 +61,7 @@ export type BreakSlot = {
 export type Shift = {
   startAt: unknown; // Firestore Timestamp
   endAt: unknown; // Firestore Timestamp
-  workType: "A" | "B" | "C" | "D" | "E" | "F" | "fixed";
+  workType: string; // ShiftType code (A, G1, etc). "fixed" is also allowed.
   breakSlots: BreakSlot[];
   absent?: boolean;
   source: "seed" | "excel" | "manual";
@@ -73,7 +80,16 @@ export type Staff = {
   firstInitial: string;
   active: boolean;
   breakPattern: "15_30" | "30_30";
-  workTypeDefault: "A" | "B" | "C" | "D" | "E" | "F" | "fixed";
+  /**
+   * 既定の勤務形態コード（ShiftType.code）
+   * 例: A, D1, K, L1 ...
+   */
+  shiftCodeDefault: string;
+  /**
+   * 旧フィールド（移行用）
+   * NOTE: 新規実装では shiftCodeDefault を使用する。
+   */
+  workTypeDefault?: "A" | "B" | "C" | "D" | "E" | "F" | "fixed";
   fixedStart?: string; // "HH:MM"
   fixedEnd?: string; // "HH:MM"
   createdAt?: unknown;

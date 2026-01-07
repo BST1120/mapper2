@@ -2,9 +2,12 @@
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
+import { writeBatch } from "firebase/firestore";
 
 import { formatDateYYYYMMDD } from "@/lib/date/today";
 import { bootstrapTenantAndAreas, seedSampleStaff } from "@/lib/firebase/bootstrap";
+import { DEFAULT_SHIFT_TYPES } from "@/lib/defaults/shiftTypes";
+import { shiftTypeDocRef, tenantDocRef } from "@/lib/firebase/refs";
 
 export function AdminSettingsClient() {
   const params = useParams<{ tenant: string; editKey: string }>();
@@ -78,6 +81,38 @@ export function AdminSettingsClient() {
         {status ? (
           <span className="text-sm text-zinc-700">{status}</span>
         ) : null}
+      </div>
+
+      <div className="mt-6 border-t pt-4">
+        <div className="text-sm font-medium">勤務形態マスタ</div>
+        <div className="mt-1 text-sm text-zinc-600">
+          A〜M / G1等の勤務形態と開始・終了時刻をアプリ内マスタ（Firestore）に作成します。
+        </div>
+        <div className="mt-3">
+          <button
+            className="rounded-lg border bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50 disabled:opacity-50"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setStatus("");
+              try {
+                const store = tenantDocRef(tenantId).firestore;
+                const batch = writeBatch(store);
+                for (const st of DEFAULT_SHIFT_TYPES) {
+                  batch.set(shiftTypeDocRef(tenantId, st.code), st, { merge: true });
+                }
+                await batch.commit();
+                setStatus(`勤務形態マスタを作成/更新しました（${DEFAULT_SHIFT_TYPES.length}件）。`);
+              } catch (e: unknown) {
+                setStatus(e instanceof Error ? e.message : "Failed to seed shift types.");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            勤務形態マスタを作成/更新
+          </button>
+        </div>
       </div>
 
       <div className="mt-6 border-t pt-4">

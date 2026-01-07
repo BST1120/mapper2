@@ -3,12 +3,14 @@
 import { getDoc, Timestamp, serverTimestamp, writeBatch } from "firebase/firestore";
 
 import { DEFAULT_AREAS } from "@/lib/defaults/areas";
+import { DEFAULT_SHIFT_TYPES } from "@/lib/defaults/shiftTypes";
 import { dateAtLocal } from "@/lib/date/localTime";
 import { ensureAnonymousAuth } from "@/lib/firebase/client";
 import {
   areaDocRef,
   assignmentDocRef,
   shiftDocRef,
+  shiftTypeDocRef,
   staffDocRef,
   tenantDocRef,
 } from "@/lib/firebase/refs";
@@ -40,29 +42,19 @@ export async function bootstrapTenantAndAreas(args: {
   for (const seed of DEFAULT_AREAS) {
     batch.set(areaDocRef(args.tenantId, seed.areaId), seed.area);
   }
+  for (const st of DEFAULT_SHIFT_TYPES) {
+    batch.set(shiftTypeDocRef(args.tenantId, st.code), st);
+  }
   await batch.commit();
 
   return { created: true as const };
 }
 
-function workTypeToTimes(workType: Staff["workTypeDefault"], staff: Staff) {
-  switch (workType) {
-    case "A":
-      return { start: "07:00", end: "16:00" };
-    case "B":
-      return { start: "07:30", end: "16:30" };
-    case "C":
-      return { start: "08:00", end: "17:00" };
-    case "D":
-      return { start: "08:30", end: "17:30" };
-    case "E":
-      return { start: "09:00", end: "18:00" };
-    case "F":
-      return { start: "10:00", end: "19:00" };
-    case "fixed":
-    default:
-      return { start: staff.fixedStart ?? "09:00", end: staff.fixedEnd ?? "18:00" };
-  }
+function codeToTimes(code: string, staff: Staff) {
+  const found = DEFAULT_SHIFT_TYPES.find((s) => s.code === code);
+  if (found) return { start: found.start, end: found.end };
+  // fallback to fixed time or a sane default
+  return { start: staff.fixedStart ?? "09:00", end: staff.fixedEnd ?? "18:00" };
 }
 
 function breakSlotsFor(staff: Staff): Shift["breakSlots"] {
@@ -90,6 +82,7 @@ export async function seedSampleStaff(args: { tenantId: string; date: string }) 
         firstInitial: "T",
         active: true,
         breakPattern: "30_30",
+        shiftCodeDefault: "C",
         workTypeDefault: "C",
       },
     },
@@ -101,6 +94,7 @@ export async function seedSampleStaff(args: { tenantId: string; date: string }) 
         firstInitial: "H",
         active: true,
         breakPattern: "15_30",
+        shiftCodeDefault: "D",
         workTypeDefault: "D",
       },
     },
@@ -112,6 +106,7 @@ export async function seedSampleStaff(args: { tenantId: string; date: string }) 
         firstInitial: "M",
         active: true,
         breakPattern: "30_30",
+        shiftCodeDefault: "B",
         workTypeDefault: "B",
       },
     },
@@ -123,6 +118,7 @@ export async function seedSampleStaff(args: { tenantId: string; date: string }) 
         firstInitial: "K",
         active: true,
         breakPattern: "15_30",
+        shiftCodeDefault: "E",
         workTypeDefault: "E",
       },
     },
@@ -141,11 +137,12 @@ export async function seedSampleStaff(args: { tenantId: string; date: string }) 
       updatedAt: Timestamp.now() as unknown,
     });
 
-    const times = workTypeToTimes(s.staff.workTypeDefault, s.staff);
+    const code = s.staff.shiftCodeDefault || s.staff.workTypeDefault || "C";
+    const times = codeToTimes(code, s.staff);
     const shift: Shift = {
       startAt: Timestamp.fromDate(dateAtLocal(args.date, times.start)) as unknown,
       endAt: Timestamp.fromDate(dateAtLocal(args.date, times.end)) as unknown,
-      workType: s.staff.workTypeDefault,
+      workType: code,
       breakSlots: breakSlotsFor(s.staff),
       source: "seed",
     };

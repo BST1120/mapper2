@@ -15,9 +15,9 @@ import {
   shiftDocRef,
   tenantDocRef,
 } from "@/lib/firebase/refs";
-import type { Shift, Staff } from "@/lib/firebase/schema";
+import type { Shift, ShiftType, Staff } from "@/lib/firebase/schema";
 import { buildDisplayName } from "@/lib/staff/displayName";
-import { useStaff } from "@/lib/firebase/hooks";
+import { useShiftTypes, useStaff } from "@/lib/firebase/hooks";
 
 function normalizeName(s: string) {
   return s.replace(/\s+/g, "").replace(/　+/g, "").trim();
@@ -36,7 +36,7 @@ function parseTimeRange(raw: string): { start: string; end: string } | null {
   return { start: `${sh}:${sm}`, end: `${eh}:${em}` };
 }
 
-function workTypeToTimes(workType: Staff["workTypeDefault"], staff: Staff) {
+function workTypeToTimes(workType: NonNullable<Staff["workTypeDefault"]>, staff: Staff) {
   switch (workType) {
     case "A":
       return { start: "07:00", end: "16:00" };
@@ -59,6 +59,14 @@ function workTypeToTimes(workType: Staff["workTypeDefault"], staff: Staff) {
   }
 }
 
+function resolveShiftType(
+  shiftTypesByCode: Record<string, ShiftType> | null | undefined,
+  code: string,
+): ShiftType | null {
+  const normalized = code.trim().toUpperCase();
+  return shiftTypesByCode?.[normalized] ?? null;
+}
+
 function breakSlotsFor(staff: Staff): Shift["breakSlots"] {
   if (staff.breakPattern === "15_30") {
     return [
@@ -72,7 +80,7 @@ function breakSlotsFor(staff: Staff): Shift["breakSlots"] {
   ];
 }
 
-function parseCode(raw: string, staff: Staff) {
+function parseCode(raw: string) {
   const v = raw.trim();
   if (!v) return { kind: "empty" as const };
   const upper = toHalfWidthAscii(v).toUpperCase().replace(/\s+/g, "");
@@ -80,17 +88,15 @@ function parseCode(raw: string, staff: Staff) {
   if (["欠", "欠勤"].includes(upper)) return { kind: "absent" as const };
   // common off markers
   if (["-", "休", "休み", "OFF"].includes(upper)) return { kind: "empty" as const };
-  // A-F with optional suffix (e.g. D1 / D１ / d1)
-  const m = upper.match(/^([A-F])[0-9]*$/);
-  if (m) return { kind: "af" as const, code: m[1] as Shift["workType"] };
+  // 勤務コード（A〜Z + 数字）例: D1 / D１ / g1 / G1
+  const m = upper.match(/^([A-Z])([0-9]*)$/);
+  if (m) return { kind: "code" as const, code: `${m[1]}${m[2]}` };
 
   const time = parseTimeRange(v);
   if (time) return { kind: "time" as const, time };
 
-  // For fixed-shift staff, allow common "worked" marks.
-  if (staff.workTypeDefault === "fixed" && ["出", "〇", "○", "◯", "P"].includes(upper)) {
-    return { kind: "fixed" as const };
-  }
+  // 既定シフトで出勤（固定シフト向け記号など）
+  if (["出", "〇", "○", "◯", "P"].includes(upper)) return { kind: "default" as const };
 
   return { kind: "unknown" as const, value: raw };
 }
@@ -126,6 +132,7 @@ export function AdminImportClient() {
   const params = useParams<{ tenant: string; editKey: string }>();
   const tenantId = params.tenant;
   const { staffById } = useStaff(tenantId);
+  const { shiftTypesByCode } = useShiftTypes(tenantId);
 
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
@@ -523,7 +530,7 @@ export function AdminImportClient() {
                 for (const h of selectedDateCols) {
                   const dateStr = h.date;
                   const raw = row.cellsByCol[h.col] ?? "";
-                  const code = parseCode(raw, staff);
+                  const code = parseCode(raw);
                   if (code.kind === "empty") continue;
                   if (code.kind === "unknown") continue;
 
@@ -533,26 +540,30 @@ export function AdminImportClient() {
 
                   if (code.kind === "absent") {
                     // 欠勤: 時刻は既定（表示用途）で保存しつつ absent を立てる
-                    workType = staff.workTypeDefault === "fixed" ? "fixed" : "C";
-                    const t = workTypeToTimes(
-                      (workType === "fixed" ? "fixed" : "C") as Staff["workTypeDefault"],
-                      staff,
-                    );
+                    workType = staff.shiftCodeDefault || staff.workTypeDefault || "C";
+                    const st = resolveShiftType(shiftTypesByCode, workType);
+                    const t = st
+                      ? { start: st.start, end: st.end }
+                      : workTypeToTimes("C", staff);
                     start = t.start;
                     end = t.end;
-                  } else if (code.kind === "af") {
+                  } else if (code.kind === "code") {
                     workType = code.code;
-                    const t = workTypeToTimes(workType, staff);
-                    start = t.start;
-                    end = t.end;
+                    const st = resolveShiftType(shiftTypesByCode, workType);
+                    if (!st) continue; // unknown code -> skip
+                    start = st.start;
+                    end = st.end;
                   } else if (code.kind === "time") {
                     workType = "fixed";
                     start = code.time.start;
                     end = code.time.end;
                   } else {
-                    // fixed mark
-                    workType = "fixed";
-                    const t = workTypeToTimes("fixed", staff);
+                    // default mark
+                    workType = staff.shiftCodeDefault || staff.workTypeDefault || "C";
+                    const st = resolveShiftType(shiftTypesByCode, workType);
+                    const t = st
+                      ? { start: st.start, end: st.end }
+                      : workTypeToTimes("C", staff);
                     start = t.start;
                     end = t.end;
                   }

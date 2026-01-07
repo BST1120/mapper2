@@ -48,3 +48,11 @@ export function shiftDocRef(tenantId: string, date: string, staffId: string) {
   return doc(getFirestoreDb(), "tenants", tenantId, "days", date, "shifts", staffId);
 }
 
+export function shiftTypesColRef(tenantId: string) {
+  return collection(getFirestoreDb(), "tenants", tenantId, "shiftTypes");
+}
+
+export function shiftTypeDocRef(tenantId: string, code: string) {
+  return doc(getFirestoreDb(), "tenants", tenantId, "shiftTypes", code);
+}
+
