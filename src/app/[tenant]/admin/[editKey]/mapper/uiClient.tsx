@@ -3,15 +3,32 @@
 import { useParams } from "next/navigation";
 
 import { MapperGrid } from "../../../mapper/ui";
-import { useAreas } from "@/lib/firebase/hooks";
+import { formatDateYYYYMMDD } from "@/lib/date/today";
+import { useAreas, useAssignments, useDayState, useStaff } from "@/lib/firebase/hooks";
 
 export function AdminMapperClient({ fallback }: { fallback: React.ReactNode }) {
   const params = useParams<{ tenant: string; editKey: string }>();
   const tenantId = params.tenant;
-  const { areasById, error } = useAreas(tenantId);
+  const date = formatDateYYYYMMDD(new Date());
+  const { areasById, error: areasError } = useAreas(tenantId);
+  const { staffById, error: staffError } = useStaff(tenantId);
+  const { assignmentsByStaffId, error: assnError } = useAssignments(tenantId, date);
+  const { state, error: stateError } = useDayState(tenantId, date);
 
+  const error = areasError || staffError || assnError || stateError;
   if (error) return <div className="text-sm text-red-600">{error}</div>;
-  if (!areasById) return <>{fallback}</>;
-  return <MapperGrid areasById={areasById} />;
+  if (!areasById || !staffById || !assignmentsByStaffId || !state) return <>{fallback}</>;
+
+  return (
+    <MapperGrid
+      mode="admin"
+      tenantId={tenantId}
+      date={date}
+      areasById={areasById}
+      staffById={staffById}
+      assignmentsByStaffId={assignmentsByStaffId}
+      editLocked={state.editLocked}
+    />
+  );
 }
 

@@ -1,4 +1,4 @@
-import { MapperGrid } from "../../../mapper/ui";
+import { MapperGridSkeleton } from "../../../mapper/ui";
 import { AdminMapperClient } from "./uiClient";
 
 export default function AdminMapperPage() {
@@ -8,7 +8,7 @@ export default function AdminMapperPage() {
       <p className="text-sm text-zinc-600">
         ここは<strong>秘密URL</strong>でアクセスする管理者用画面です（編集機能は次で実装）。
       </p>
-      <AdminMapperClient fallback={<MapperGrid />} />
+      <AdminMapperClient fallback={<MapperGridSkeleton />} />
     </div>
   );
 }

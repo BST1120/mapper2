@@ -3,11 +3,13 @@
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
-import { bootstrapTenantAndAreas } from "@/lib/firebase/bootstrap";
+import { formatDateYYYYMMDD } from "@/lib/date/today";
+import { bootstrapTenantAndAreas, seedSampleStaff } from "@/lib/firebase/bootstrap";
 
 export function AdminSettingsClient() {
   const params = useParams<{ tenant: string; editKey: string }>();
   const tenantId = params.tenant;
+  const date = formatDateYYYYMMDD(new Date());
 
   const [tenantName, setTenantName] = useState("iwara");
   const [minStaff, setMinStaff] = useState<number>(0);
@@ -76,6 +78,33 @@ export function AdminSettingsClient() {
         {status ? (
           <span className="text-sm text-zinc-700">{status}</span>
         ) : null}
+      </div>
+
+      <div className="mt-6 border-t pt-4">
+        <div className="text-sm font-medium">開発用: サンプル職員</div>
+        <div className="mt-1 text-sm text-zinc-600">
+          マッパーのD&D動作確認用に、サンプル職員を追加します（当日: {date}）。
+        </div>
+        <div className="mt-3">
+          <button
+            className="rounded-lg border bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50 disabled:opacity-50"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setStatus("");
+              try {
+                const res = await seedSampleStaff({ tenantId, date });
+                setStatus(`サンプル職員を追加しました（${res.created}名）。`);
+              } catch (e: unknown) {
+                setStatus(e instanceof Error ? e.message : "Failed to seed staff.");
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            サンプル職員を追加
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">

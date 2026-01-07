@@ -20,6 +20,19 @@ export type Area = {
   type: AreaType;
 };
 
+export type Assignment = {
+  areaId: string;
+  version: number;
+  updatedAt?: unknown;
+  updatedByUid?: string;
+};
+
+export type DayState = {
+  editLocked: boolean;
+  lockedAt?: unknown;
+  lockedByUid?: string;
+};
+
 export type Staff = {
   lastName: string;
   firstName: string;
