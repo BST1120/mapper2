@@ -122,14 +122,32 @@ function DroppableArea({
   count,
   disabled,
   children,
+  size = "md",
 }: {
   areaId: string;
   title: string;
   count: number;
   disabled: boolean;
   children: React.ReactNode;
+  size?: "sm" | "md" | "lg" | "xl";
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: areaId, disabled });
+
+  const bodyHeightClass = (() => {
+    switch (size) {
+      case "sm":
+        return "max-h-20"; // ~80px
+      case "md":
+        return "max-h-28"; // ~112px
+      case "lg":
+        return "max-h-36"; // ~144px
+      case "xl":
+        return "max-h-52"; // ~208px
+      default:
+        return "max-h-28";
+    }
+  })();
+
   return (
     <section
       ref={setNodeRef}
@@ -142,7 +160,13 @@ function DroppableArea({
         <div className="font-medium">{title}</div>
         <div className="text-xs text-zinc-500">{count}名</div>
       </div>
-      <div className="mt-2 grid grid-cols-[repeat(auto-fill,minmax(52px,1fr))] gap-2">
+      <div
+        className={[
+          "mt-2 grid grid-cols-[repeat(auto-fill,minmax(52px,1fr))] gap-2",
+          bodyHeightClass,
+          "overflow-auto overscroll-contain pr-1",
+        ].join(" ")}
+      >
         {children}
       </div>
     </section>
@@ -289,6 +313,7 @@ export function MapperGrid({
                     title={areaNameFrom(areasById ?? null, slot)}
                     count={(staffByAreaId[slot.id] ?? []).length}
                     disabled={!canEdit}
+                    size="sm"
                   >
                     {(staffByAreaId[slot.id] ?? []).map((staffId) => (
                       <DraggableStaff
@@ -309,6 +334,7 @@ export function MapperGrid({
                     title={areaNameFrom(areasById ?? null, slot)}
                     count={(staffByAreaId[slot.id] ?? []).length}
                     disabled={!canEdit}
+                    size="md"
                   >
                     {(staffByAreaId[slot.id] ?? []).map((staffId) => (
                       <DraggableStaff
@@ -328,6 +354,7 @@ export function MapperGrid({
                   title={areaNameFrom(areasById ?? null, bottomRow)}
                   count={(staffByAreaId[bottomRow.id] ?? []).length}
                   disabled={!canEdit}
+                  size="lg"
                 >
                   {(staffByAreaId[bottomRow.id] ?? []).map((staffId) => (
                     <DraggableStaff
@@ -358,6 +385,7 @@ export function MapperGrid({
             title="フリー"
             count={(staffByAreaId["free"] ?? []).length}
             disabled={!canEdit}
+            size="xl"
           >
             {(staffByAreaId["free"] ?? []).map((staffId) => (
               <DraggableStaff
@@ -374,6 +402,7 @@ export function MapperGrid({
             title="休憩"
             count={(staffByAreaId["break"] ?? []).length}
             disabled={!canEdit}
+            size="xl"
           >
             {(staffByAreaId["break"] ?? []).map((staffId) => (
               <DraggableStaff
