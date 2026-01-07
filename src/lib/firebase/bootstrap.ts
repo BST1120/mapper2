@@ -1,11 +1,18 @@
 "use client";
 
-import { writeBatch, serverTimestamp, getDoc } from "firebase/firestore";
+import { getDoc, Timestamp, serverTimestamp, writeBatch } from "firebase/firestore";
 
 import { DEFAULT_AREAS } from "@/lib/defaults/areas";
+import { dateAtLocal } from "@/lib/date/localTime";
 import { ensureAnonymousAuth } from "@/lib/firebase/client";
-import { areaDocRef, assignmentDocRef, staffDocRef, tenantDocRef } from "@/lib/firebase/refs";
-import type { Staff, Tenant } from "@/lib/firebase/schema";
+import {
+  areaDocRef,
+  assignmentDocRef,
+  shiftDocRef,
+  staffDocRef,
+  tenantDocRef,
+} from "@/lib/firebase/refs";
+import type { Shift, Staff, Tenant } from "@/lib/firebase/schema";
 
 export async function bootstrapTenantAndAreas(args: {
   tenantId: string;
@@ -36,6 +43,39 @@ export async function bootstrapTenantAndAreas(args: {
   await batch.commit();
 
   return { created: true as const };
+}
+
+function workTypeToTimes(workType: Staff["workTypeDefault"], staff: Staff) {
+  switch (workType) {
+    case "A":
+      return { start: "07:00", end: "16:00" };
+    case "B":
+      return { start: "07:30", end: "16:30" };
+    case "C":
+      return { start: "08:00", end: "17:00" };
+    case "D":
+      return { start: "08:30", end: "17:30" };
+    case "E":
+      return { start: "09:00", end: "18:00" };
+    case "F":
+      return { start: "10:00", end: "19:00" };
+    case "fixed":
+    default:
+      return { start: staff.fixedStart ?? "09:00", end: staff.fixedEnd ?? "18:00" };
+  }
+}
+
+function breakSlotsFor(staff: Staff): Shift["breakSlots"] {
+  if (staff.breakPattern === "15_30") {
+    return [
+      { minutes: 15, used: false },
+      { minutes: 30, used: false },
+    ];
+  }
+  return [
+    { minutes: 30, used: false },
+    { minutes: 30, used: false },
+  ];
 }
 
 export async function seedSampleStaff(args: { tenantId: string; date: string }) {
@@ -92,14 +132,24 @@ export async function seedSampleStaff(args: { tenantId: string; date: string }) 
   for (const s of samples) {
     batch.set(staffDocRef(args.tenantId, s.id), {
       ...s.staff,
-      createdAt: serverTimestamp() as unknown,
-      updatedAt: serverTimestamp() as unknown,
+      createdAt: Timestamp.now() as unknown,
+      updatedAt: Timestamp.now() as unknown,
     });
     batch.set(assignmentDocRef(args.tenantId, args.date, s.id), {
       areaId: "free",
       version: 1,
-      updatedAt: serverTimestamp() as unknown,
+      updatedAt: Timestamp.now() as unknown,
     });
+
+    const times = workTypeToTimes(s.staff.workTypeDefault, s.staff);
+    const shift: Shift = {
+      startAt: Timestamp.fromDate(dateAtLocal(args.date, times.start)) as unknown,
+      endAt: Timestamp.fromDate(dateAtLocal(args.date, times.end)) as unknown,
+      workType: s.staff.workTypeDefault,
+      breakSlots: breakSlotsFor(s.staff),
+      source: "seed",
+    };
+    batch.set(shiftDocRef(args.tenantId, args.date, s.id), shift);
   }
   await batch.commit();
   return { created: samples.length };

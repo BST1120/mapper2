@@ -40,3 +40,11 @@ export function auditLogsColRef(tenantId: string, date: string) {
   return collection(getFirestoreDb(), "tenants", tenantId, "days", date, "auditLogs");
 }
 
+export function shiftsColRef(tenantId: string, date: string) {
+  return collection(getFirestoreDb(), "tenants", tenantId, "days", date, "shifts");
+}
+
+export function shiftDocRef(tenantId: string, date: string, staffId: string) {
+  return doc(getFirestoreDb(), "tenants", tenantId, "days", date, "shifts", staffId);
+}
+

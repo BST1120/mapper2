@@ -7,9 +7,10 @@ import {
   areasColRef,
   assignmentsColRef,
   dayStateDocRef,
+  shiftsColRef,
   staffColRef,
 } from "@/lib/firebase/refs";
-import type { Area, Assignment, DayState, Staff } from "@/lib/firebase/schema";
+import type { Area, Assignment, DayState, Shift, Staff } from "@/lib/firebase/schema";
 
 export function useAreas(tenantId: string) {
   const [areasById, setAreasById] = useState<Record<string, Area> | null>(null);
@@ -122,5 +123,32 @@ export function useDayState(tenantId: string, date: string) {
   }, [tenantId, date]);
 
   return { state, error };
+}
+
+export function useShifts(tenantId: string, date: string) {
+  const [shiftsByStaffId, setShiftsByStaffId] = useState<Record<string, Shift> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const q = useMemo(() => {
+    const col = shiftsColRef(tenantId, date);
+    return query(col);
+  }, [tenantId, date]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const next: Record<string, Shift> = {};
+        snap.forEach((d) => {
+          next[d.id] = d.data() as Shift;
+        });
+        setShiftsByStaffId(next);
+      },
+      (e) => setError(e instanceof Error ? e.message : "Failed to load shifts"),
+    );
+    return () => unsub();
+  }, [q]);
+
+  return { shiftsByStaffId, error };
 }
 

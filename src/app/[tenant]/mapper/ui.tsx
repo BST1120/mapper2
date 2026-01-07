@@ -1,10 +1,15 @@
 "use client";
 
 import type { Area as AreaDoc } from "@/lib/firebase/schema";
-import type { Assignment, Staff } from "@/lib/firebase/schema";
+import type { Assignment, Shift, Staff } from "@/lib/firebase/schema";
 import { buildDisplayName } from "@/lib/staff/displayName";
 import { ensureAnonymousAuth } from "@/lib/firebase/client";
-import { assignmentDocRef, auditLogsColRef, dayStateDocRef } from "@/lib/firebase/refs";
+import {
+  assignmentDocRef,
+  auditLogsColRef,
+  dayStateDocRef,
+  shiftDocRef,
+} from "@/lib/firebase/refs";
 import {
   DndContext,
   DragOverlay,
@@ -17,7 +22,15 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { useMemo, useState } from "react";
-import { addDoc, runTransaction, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import {
+  addDoc,
+  getDoc,
+  runTransaction,
+  serverTimestamp,
+  setDoc,
+  Timestamp,
+  updateDoc,
+} from "firebase/firestore";
 
 type AreaSlot = { id: string; fallbackName: string; span?: number };
 
@@ -63,6 +76,7 @@ type MapperGridProps = {
   areasById?: Record<string, AreaDoc> | null;
   staffById: Record<string, Staff>;
   assignmentsByStaffId: Record<string, Assignment>;
+  shiftsByStaffId: Record<string, Shift>;
   editLocked: boolean;
 };
 
@@ -83,10 +97,16 @@ function DraggableStaff({
   staffId,
   staff,
   enabled,
+  chipClassName,
+  badge,
+  onClick,
 }: {
   staffId: string;
   staff: Staff;
   enabled: boolean;
+  chipClassName?: string;
+  badge?: string | null;
+  onClick?: () => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
     useDraggable({
@@ -111,7 +131,16 @@ function DraggableStaff({
       {...attributes}
       {...listeners}
     >
-      <StaffChip staff={staff} />
+      <div onClick={onClick} className="select-none">
+        <div className={["relative", chipClassName ?? ""].join(" ")}>
+          <StaffChip staff={staff} />
+          {badge ? (
+            <div className="absolute -top-2 -right-2 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-white">
+              {badge}
+            </div>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
@@ -180,6 +209,7 @@ export function MapperGrid({
   areasById,
   staffById,
   assignmentsByStaffId,
+  shiftsByStaffId,
   editLocked,
 }: MapperGridProps) {
   const sensors = useSensors(useSensor(PointerSensor));
@@ -208,6 +238,110 @@ export function MapperGrid({
   }, [assignmentsByStaffId, staffById]);
 
   const canEdit = mode === "admin" && !editLocked;
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+
+  function getBreakBadge(staffId: string): string | null {
+    const shift = shiftsByStaffId[staffId];
+    if (!shift?.breakSlots?.length) return null;
+    const remaining = shift.breakSlots.filter((s) => !s.used).length;
+    return `休${remaining}`;
+  }
+
+  function isShiftEnded(staffId: string): boolean {
+    const shift = shiftsByStaffId[staffId];
+    const endAt = shift?.endAt as unknown as Timestamp | undefined;
+    if (!endAt?.toDate) return false;
+    return Date.now() > endAt.toDate().getTime();
+  }
+
+  async function startNextBreak(staffId: string) {
+    if (!canEdit) return;
+    await ensureAnonymousAuth();
+    setBanner(null);
+
+    const shiftRef = shiftDocRef(tenantId, date, staffId);
+    const shiftSnap = await getDoc(shiftRef);
+    if (!shiftSnap.exists()) {
+      setBanner("勤務データがありません（shifts）。");
+      return;
+    }
+    const shift = shiftSnap.data() as Shift;
+    const endAt = shift.endAt as unknown as Timestamp;
+    const endMs = endAt?.toDate?.().getTime?.();
+    if (!endMs) {
+      setBanner("勤務終了時刻が不正です。");
+      return;
+    }
+    const now = Date.now();
+    if (now > endMs - 30 * 60 * 1000) {
+      setBanner("退勤30分前以降は休憩を開始できません。");
+      return;
+    }
+
+    const slots = shift.breakSlots ?? [];
+    const idx = slots.findIndex((s) => !s.used);
+    if (idx === -1) {
+      setBanner("休憩枠が残っていません。");
+      return;
+    }
+    const minutes = slots[idx]!.minutes;
+
+    // Update shift slot + move to break area (best-effort conflict handling)
+    await runTransaction(shiftRef.firestore, async (tx) => {
+      const snap = await tx.get(shiftRef);
+      const cur = snap.data() as Shift | undefined;
+      if (!cur) throw new Error("SHIFT_MISSING");
+      const nextSlots = [...(cur.breakSlots ?? [])];
+      const i = nextSlots.findIndex((s) => !s.used);
+      if (i === -1) throw new Error("NO_SLOT");
+      nextSlots[i] = {
+        ...nextSlots[i]!,
+        used: true,
+        startedAt: serverTimestamp() as unknown,
+      };
+      tx.update(shiftRef, { breakSlots: nextSlots });
+    });
+
+    // Move to break area using existing move logic (will add audit log)
+    await moveStaff(staffId, "break");
+    void addDoc(auditLogsColRef(tenantId, date), {
+      timestamp: serverTimestamp() as unknown,
+      type: "break_start",
+      staffId,
+      minutes,
+    });
+  }
+
+  async function endBreak(staffId: string) {
+    if (!canEdit) return;
+    await ensureAnonymousAuth();
+    setBanner(null);
+
+    const shiftRef = shiftDocRef(tenantId, date, staffId);
+    try {
+      await runTransaction(shiftRef.firestore, async (tx) => {
+        const snap = await tx.get(shiftRef);
+        const cur = snap.data() as Shift | undefined;
+        if (!cur) throw new Error("SHIFT_MISSING");
+        const slots = [...(cur.breakSlots ?? [])];
+        const idx = slots.findIndex((s) => s.used && !s.endedAt);
+        if (idx === -1) return; // nothing to end
+        slots[idx] = { ...slots[idx]!, endedAt: serverTimestamp() as unknown };
+        tx.update(shiftRef, { breakSlots: slots });
+      });
+    } catch (e: unknown) {
+      setBanner(e instanceof Error ? e.message : "休憩終了に失敗しました。");
+      return;
+    }
+
+    // Move back to free (MVP)
+    await moveStaff(staffId, "free");
+    void addDoc(auditLogsColRef(tenantId, date), {
+      timestamp: serverTimestamp() as unknown,
+      type: "break_end",
+      staffId,
+    });
+  }
 
   async function moveStaff(staffId: string, toAreaId: string) {
     await ensureAnonymousAuth();
@@ -292,6 +426,36 @@ export function MapperGrid({
             {editLocked ? "ロック解除" : "ロックする"}
           </button>
           <div className="text-xs text-zinc-500">日付: {date}</div>
+          {selectedStaffId ? (
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div className="text-sm text-zinc-600">
+                選択:{" "}
+                <span className="font-medium">
+                  {buildDisplayName(staffById[selectedStaffId]!)}
+                </span>
+              </div>
+              <button
+                className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50 disabled:opacity-50"
+                disabled={!canEdit}
+                onClick={() => void startNextBreak(selectedStaffId)}
+              >
+                休憩開始（次枠）
+              </button>
+              <button
+                className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50 disabled:opacity-50"
+                disabled={!canEdit}
+                onClick={() => void endBreak(selectedStaffId)}
+              >
+                休憩終了
+              </button>
+              <button
+                className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50"
+                onClick={() => setSelectedStaffId(null)}
+              >
+                選択解除
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="text-xs text-zinc-500">日付: {date}</div>
@@ -336,6 +500,9 @@ export function MapperGrid({
                         staffId={staffId}
                         staff={staffById[staffId]!}
                         enabled={canEdit}
+                        badge={getBreakBadge(staffId)}
+                        chipClassName={isShiftEnded(staffId) ? "opacity-40 grayscale" : ""}
+                        onClick={() => canEdit && setSelectedStaffId(staffId)}
                       />
                     ))}
                   </DroppableArea>
@@ -357,6 +524,9 @@ export function MapperGrid({
                         staffId={staffId}
                         staff={staffById[staffId]!}
                         enabled={canEdit}
+                        badge={getBreakBadge(staffId)}
+                        chipClassName={isShiftEnded(staffId) ? "opacity-40 grayscale" : ""}
+                        onClick={() => canEdit && setSelectedStaffId(staffId)}
                       />
                     ))}
                   </DroppableArea>
@@ -377,6 +547,9 @@ export function MapperGrid({
                       staffId={staffId}
                       staff={staffById[staffId]!}
                       enabled={canEdit}
+                      badge={getBreakBadge(staffId)}
+                      chipClassName={isShiftEnded(staffId) ? "opacity-40 grayscale" : ""}
+                      onClick={() => canEdit && setSelectedStaffId(staffId)}
                     />
                   ))}
                 </DroppableArea>
@@ -408,6 +581,9 @@ export function MapperGrid({
                 staffId={staffId}
                 staff={staffById[staffId]!}
                 enabled={canEdit}
+                badge={getBreakBadge(staffId)}
+                chipClassName={isShiftEnded(staffId) ? "opacity-40 grayscale" : ""}
+                onClick={() => canEdit && setSelectedStaffId(staffId)}
               />
             ))}
           </DroppableArea>
@@ -425,6 +601,9 @@ export function MapperGrid({
                 staffId={staffId}
                 staff={staffById[staffId]!}
                 enabled={canEdit}
+                badge={getBreakBadge(staffId)}
+                chipClassName={isShiftEnded(staffId) ? "opacity-40 grayscale" : ""}
+                onClick={() => canEdit && setSelectedStaffId(staffId)}
               />
             ))}
           </DroppableArea>

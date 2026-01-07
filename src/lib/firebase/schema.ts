@@ -35,11 +35,27 @@ export type DayState = {
 
 export type AuditLog = {
   timestamp: unknown;
-  type: "move" | "lock" | "unlock";
+  type: "move" | "lock" | "unlock" | "break_start" | "break_end";
   staffId?: string;
   fromAreaId?: string;
   toAreaId?: string;
+  minutes?: number;
   uid?: string;
+};
+
+export type BreakSlot = {
+  minutes: 15 | 30;
+  used: boolean;
+  startedAt?: unknown;
+  endedAt?: unknown;
+};
+
+export type Shift = {
+  startAt: unknown; // Firestore Timestamp
+  endAt: unknown; // Firestore Timestamp
+  workType: "A" | "B" | "C" | "D" | "E" | "F" | "fixed";
+  breakSlots: BreakSlot[];
+  source: "seed" | "excel" | "manual";
 };
 
 export type Staff = {
