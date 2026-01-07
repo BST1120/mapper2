@@ -35,11 +35,12 @@ export type DayState = {
 
 export type AuditLog = {
   timestamp: unknown;
-  type: "move" | "lock" | "unlock" | "break_start" | "break_end";
+  type: "move" | "lock" | "unlock" | "break_start" | "break_end" | "import";
   staffId?: string;
   fromAreaId?: string;
   toAreaId?: string;
   minutes?: number;
+  importedCount?: number;
   uid?: string;
 };
 

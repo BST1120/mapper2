@@ -3,10 +3,10 @@ export default function ImportPage() {
     <div className="space-y-3">
       <h2 className="text-xl font-semibold tracking-tight">取込（Excel）</h2>
       <p className="text-sm text-zinc-600">
-        勤務表（.xlsx）から当日の出勤者と勤務形態を生成します（実装中）。
+        ここは閲覧用です。取込は管理者用（秘密URL）で行います。
       </p>
       <div className="rounded-xl border bg-white p-4 text-sm text-zinc-600">
-        ここにファイルアップロード、日付選択、エラー一覧が入ります。
+        管理者URL: <code>/{`{tenant}`}/admin/{`{editKey}`}/import</code>
       </div>
     </div>
   );
