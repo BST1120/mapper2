@@ -56,6 +56,7 @@ export type Shift = {
   endAt: unknown; // Firestore Timestamp
   workType: "A" | "B" | "C" | "D" | "E" | "F" | "fixed";
   breakSlots: BreakSlot[];
+  absent?: boolean;
   source: "seed" | "excel" | "manual";
 };
 

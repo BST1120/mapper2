@@ -75,10 +75,14 @@ function breakSlotsFor(staff: Staff): Shift["breakSlots"] {
 function parseCode(raw: string, staff: Staff) {
   const v = raw.trim();
   if (!v) return { kind: "empty" as const };
-  const upper = v.toUpperCase();
-  if (["A", "B", "C", "D", "E", "F"].includes(upper))
-    return { kind: "af" as const, code: upper as Shift["workType"] };
+  const upper = toHalfWidthAscii(v).toUpperCase().replace(/\s+/g, "");
+  // 欠勤
+  if (["欠", "欠勤"].includes(upper)) return { kind: "absent" as const };
+  // common off markers
   if (["-", "休", "休み", "OFF"].includes(upper)) return { kind: "empty" as const };
+  // A-F with optional suffix (e.g. D1 / D１ / d1)
+  const m = upper.match(/^([A-F])[0-9]*$/);
+  if (m) return { kind: "af" as const, code: m[1] as Shift["workType"] };
 
   const time = parseTimeRange(v);
   if (time) return { kind: "time" as const, time };
@@ -91,7 +95,22 @@ function parseCode(raw: string, staff: Staff) {
   return { kind: "unknown" as const, value: raw };
 }
 
+function toHalfWidthAscii(input: string) {
+  // Convert fullwidth alphanumerics to halfwidth (FF01-FF5E).
+  let out = "";
+  for (const ch of input) {
+    const code = ch.charCodeAt(0);
+    if (code >= 0xff01 && code <= 0xff5e) {
+      out += String.fromCharCode(code - 0xfee0);
+    } else {
+      out += ch;
+    }
+  }
+  return out;
+}
+
 type RowPreview = {
+  row: number;
   excelName: string;
   staffId?: string;
   status: "ok" | "needs_select" | "unmatched";
@@ -112,6 +131,7 @@ export function AdminImportClient() {
   const [status, setStatus] = useState("");
   const [fileName, setFileName] = useState("");
   const [parsed, setParsed] = useState<ParsedRoster | null>(null);
+  const [file, setFile] = useState<File | null>(null);
 
   // Range/config (defaults)
   const [headerRow, setHeaderRow] = useState(7);
@@ -175,19 +195,19 @@ export function AdminImportClient() {
       const excelName = r.name;
       const norm = normalizeName(excelName);
       const explicit = nameMap[excelName];
-      if (explicit) return { excelName, staffId: explicit, status: "ok" };
+      if (explicit) return { row: r.row, excelName, staffId: explicit, status: "ok" };
 
       const full = staffIndex.fullIndex[norm];
-      if (full?.length === 1) return { excelName, staffId: full[0]!, status: "ok" };
+      if (full?.length === 1) return { row: r.row, excelName, staffId: full[0]!, status: "ok" };
       if (full?.length && full.length > 1)
-        return { excelName, status: "needs_select" };
+        return { row: r.row, excelName, status: "needs_select" };
 
       const last = staffIndex.lastIndex[norm];
-      if (last?.length === 1) return { excelName, staffId: last[0]!, status: "ok" };
+      if (last?.length === 1) return { row: r.row, excelName, staffId: last[0]!, status: "ok" };
       if (last?.length && last.length > 1)
-        return { excelName, status: "needs_select" };
+        return { row: r.row, excelName, status: "needs_select" };
 
-      return { excelName, status: "unmatched" };
+      return { row: r.row, excelName, status: "unmatched" };
     });
   }, [parsed, staffById, staffIndex, nameMap]);
 
@@ -200,7 +220,7 @@ export function AdminImportClient() {
             <label className="grid gap-1">
               <span className="text-xs text-zinc-600">日付の行（例: 7）</span>
               <input
-                className="rounded-lg border px-2 py-1"
+                className="w-full min-w-0 rounded-lg border px-2 py-1"
                 type="number"
                 value={headerRow}
                 onChange={(e) => setHeaderRow(Number(e.target.value))}
@@ -209,43 +229,43 @@ export function AdminImportClient() {
             <label className="grid gap-1">
               <span className="text-xs text-zinc-600">氏名の列（例: B）</span>
               <input
-                className="rounded-lg border px-2 py-1"
+                className="w-full min-w-0 rounded-lg border px-2 py-1"
                 value={nameCol}
                 onChange={(e) => setNameCol(e.target.value)}
               />
             </label>
             <div className="grid grid-cols-2 gap-2">
-              <label className="grid gap-1">
+              <label className="grid min-w-0 gap-1">
                 <span className="text-xs text-zinc-600">日付開始列（例: C）</span>
                 <input
-                  className="rounded-lg border px-2 py-1"
+                  className="w-full min-w-0 rounded-lg border px-2 py-1"
                   value={dateStartCol}
                   onChange={(e) => setDateStartCol(e.target.value)}
                 />
               </label>
-              <label className="grid gap-1">
+              <label className="grid min-w-0 gap-1">
                 <span className="text-xs text-zinc-600">日付終了列（例: AG）</span>
                 <input
-                  className="rounded-lg border px-2 py-1"
+                  className="w-full min-w-0 rounded-lg border px-2 py-1"
                   value={dateEndCol}
                   onChange={(e) => setDateEndCol(e.target.value)}
                 />
               </label>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <label className="grid gap-1">
+              <label className="grid min-w-0 gap-1">
                 <span className="text-xs text-zinc-600">データ開始行（例: 8）</span>
                 <input
-                  className="rounded-lg border px-2 py-1"
+                  className="w-full min-w-0 rounded-lg border px-2 py-1"
                   type="number"
                   value={dataStartRow}
                   onChange={(e) => setDataStartRow(Number(e.target.value))}
                 />
               </label>
-              <label className="grid gap-1">
+              <label className="grid min-w-0 gap-1">
                 <span className="text-xs text-zinc-600">データ終了行（空=最後まで）</span>
                 <input
-                  className="rounded-lg border px-2 py-1"
+                  className="w-full min-w-0 rounded-lg border px-2 py-1"
                   value={dataEndRow}
                   onChange={(e) => setDataEndRow(e.target.value)}
                 />
@@ -254,7 +274,7 @@ export function AdminImportClient() {
             <label className="grid gap-1">
               <span className="text-xs text-zinc-600">月ヒント（YYYY-MM）</span>
               <input
-                className="rounded-lg border px-2 py-1"
+                className="w-full min-w-0 rounded-lg border px-2 py-1"
                 value={monthHint}
                 onChange={(e) => setMonthHint(e.target.value)}
               />
@@ -262,6 +282,9 @@ export function AdminImportClient() {
                 見出しが「1」「2」…だけの時にこの月で補完します。
               </span>
             </label>
+            <div className="text-xs text-zinc-500">
+              行/列はExcelと同じく<strong>1始まり</strong>です（例: 7行目 = 7）。
+            </div>
           </div>
         </div>
 
@@ -279,6 +302,7 @@ export function AdminImportClient() {
                 setBusy(true);
                 setStatus("");
                 setFileName(f.name);
+                setFile(f);
                 setParsed(null);
                 try {
                   const opts = {
@@ -303,6 +327,38 @@ export function AdminImportClient() {
                 }
               }}
             />
+            <button
+              className="w-fit rounded-lg border bg-white px-3 py-1 text-sm hover:bg-zinc-50 disabled:opacity-50"
+              disabled={busy || !file}
+              onClick={async () => {
+                if (!file) return;
+                setBusy(true);
+                setStatus("");
+                try {
+                  const opts = {
+                    headerRow,
+                    nameCol: colToNumber(nameCol),
+                    dateStartCol: colToNumber(dateStartCol),
+                    dateEndCol: dateEndCol ? colToNumber(dateEndCol) : undefined,
+                    dataStartRow,
+                    dataEndRow: dataEndRow ? Number(dataEndRow) : undefined,
+                    monthHint: monthHint?.trim() || undefined,
+                  };
+                  if (!opts.nameCol || !opts.dateStartCol) {
+                    throw new Error("列指定が不正です（A〜Zの形式で入力してください）。");
+                  }
+                  const res = await parseRosterXlsx(file, opts);
+                  setParsed(res);
+                } catch (err: unknown) {
+                  setStatus(err instanceof Error ? err.message : "再解析に失敗しました。");
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              type="button"
+            >
+              設定変更後に再解析
+            </button>
             {fileName ? (
               <div className="text-sm text-zinc-600">
                 ファイル: <span className="font-medium">{fileName}</span>
@@ -386,7 +442,7 @@ export function AdminImportClient() {
                   const needsSelect = r.status !== "ok";
                   const excelName = r.excelName;
                   return (
-                    <tr key={excelName} className="border-t">
+                    <tr key={`${r.row}-${excelName}`} className="border-t">
                       <td className="p-2">{excelName}</td>
                       <td className="p-2">
                         <select
@@ -475,7 +531,16 @@ export function AdminImportClient() {
                   let end: string;
                   let workType: Shift["workType"];
 
-                  if (code.kind === "af") {
+                  if (code.kind === "absent") {
+                    // 欠勤: 時刻は既定（表示用途）で保存しつつ absent を立てる
+                    workType = staff.workTypeDefault === "fixed" ? "fixed" : "C";
+                    const t = workTypeToTimes(
+                      (workType === "fixed" ? "fixed" : "C") as Staff["workTypeDefault"],
+                      staff,
+                    );
+                    start = t.start;
+                    end = t.end;
+                  } else if (code.kind === "af") {
                     workType = code.code;
                     const t = workTypeToTimes(workType, staff);
                     start = t.start;
@@ -497,6 +562,7 @@ export function AdminImportClient() {
                     endAt: Timestamp.fromDate(dateAtLocal(dateStr, end)) as unknown,
                     workType,
                     breakSlots: breakSlotsFor(staff),
+                    absent: code.kind === "absent",
                     source: "excel",
                   };
 

@@ -149,6 +149,7 @@ function DroppableArea({
   areaId,
   title,
   count,
+  countLabel,
   disabled,
   children,
   size = "md",
@@ -156,6 +157,7 @@ function DroppableArea({
   areaId: string;
   title: string;
   count: number;
+  countLabel?: string;
   disabled: boolean;
   children: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
@@ -187,7 +189,7 @@ function DroppableArea({
     >
       <div className="flex items-center justify-between">
         <div className="font-medium">{title}</div>
-        <div className="text-xs text-zinc-500">{count}名</div>
+        <div className="text-xs text-zinc-500">{countLabel ?? `${count}名`}</div>
       </div>
       <div
         className={[
@@ -247,11 +249,41 @@ export function MapperGrid({
     return `休${remaining}`;
   }
 
+  function isAbsent(staffId: string): boolean {
+    return Boolean(shiftsByStaffId[staffId]?.absent);
+  }
+
+  function getChipBadge(staffId: string): string | null {
+    if (isAbsent(staffId)) return "欠";
+    return getBreakBadge(staffId);
+  }
+
+  function countLabelFor(areaId: string) {
+    const ids = staffByAreaId[areaId] ?? [];
+    const absent = ids.filter((id) => isAbsent(id)).length;
+    const present = ids.length - absent;
+    return absent > 0 ? `${present}名(+欠${absent})` : `${present}名`;
+  }
+
   function isShiftEnded(staffId: string): boolean {
     const shift = shiftsByStaffId[staffId];
     const endAt = shift?.endAt as unknown as Timestamp | undefined;
     if (!endAt?.toDate) return false;
     return Date.now() > endAt.toDate().getTime();
+  }
+
+  async function setAbsent(staffId: string, absent: boolean) {
+    if (!canEdit) return;
+    await ensureAnonymousAuth();
+    setBanner(null);
+
+    const ref = shiftDocRef(tenantId, date, staffId);
+    await setDoc(ref, { absent }, { merge: true });
+
+    if (absent) {
+      // 欠勤にする場合は、配置をフリーへ戻す（MVP）
+      await moveStaff(staffId, "free");
+    }
   }
 
   async function startNextBreak(staffId: string) {
@@ -449,6 +481,13 @@ export function MapperGrid({
                 休憩終了
               </button>
               <button
+                className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50 disabled:opacity-50"
+                disabled={!canEdit}
+                onClick={() => void setAbsent(selectedStaffId, !isAbsent(selectedStaffId))}
+              >
+                {isAbsent(selectedStaffId) ? "欠勤解除" : "欠勤にする"}
+              </button>
+              <button
                 className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50"
                 onClick={() => setSelectedStaffId(null)}
               >
@@ -491,6 +530,7 @@ export function MapperGrid({
                     areaId={slot.id}
                     title={areaNameFrom(areasById ?? null, slot)}
                     count={(staffByAreaId[slot.id] ?? []).length}
+                    countLabel={countLabelFor(slot.id)}
                     disabled={!canEdit}
                     size="sm"
                   >
@@ -499,9 +539,12 @@ export function MapperGrid({
                         key={staffId}
                         staffId={staffId}
                         staff={staffById[staffId]!}
-                        enabled={canEdit}
-                        badge={getBreakBadge(staffId)}
-                        chipClassName={isShiftEnded(staffId) ? "opacity-40 grayscale" : ""}
+                        enabled={canEdit && !isAbsent(staffId)}
+                        badge={getChipBadge(staffId)}
+                        chipClassName={[
+                          isShiftEnded(staffId) ? "opacity-40 grayscale" : "",
+                          isAbsent(staffId) ? "opacity-40 grayscale" : "",
+                        ].join(" ")}
                         onClick={() => canEdit && setSelectedStaffId(staffId)}
                       />
                     ))}
@@ -515,6 +558,7 @@ export function MapperGrid({
                     areaId={slot.id}
                     title={areaNameFrom(areasById ?? null, slot)}
                     count={(staffByAreaId[slot.id] ?? []).length}
+                    countLabel={countLabelFor(slot.id)}
                     disabled={!canEdit}
                     size="md"
                   >
@@ -523,9 +567,12 @@ export function MapperGrid({
                         key={staffId}
                         staffId={staffId}
                         staff={staffById[staffId]!}
-                        enabled={canEdit}
-                        badge={getBreakBadge(staffId)}
-                        chipClassName={isShiftEnded(staffId) ? "opacity-40 grayscale" : ""}
+                        enabled={canEdit && !isAbsent(staffId)}
+                        badge={getChipBadge(staffId)}
+                        chipClassName={[
+                          isShiftEnded(staffId) ? "opacity-40 grayscale" : "",
+                          isAbsent(staffId) ? "opacity-40 grayscale" : "",
+                        ].join(" ")}
                         onClick={() => canEdit && setSelectedStaffId(staffId)}
                       />
                     ))}
@@ -538,6 +585,7 @@ export function MapperGrid({
                   areaId={bottomRow.id}
                   title={areaNameFrom(areasById ?? null, bottomRow)}
                   count={(staffByAreaId[bottomRow.id] ?? []).length}
+                  countLabel={countLabelFor(bottomRow.id)}
                   disabled={!canEdit}
                   size="lg"
                 >
@@ -546,9 +594,12 @@ export function MapperGrid({
                       key={staffId}
                       staffId={staffId}
                       staff={staffById[staffId]!}
-                      enabled={canEdit}
-                      badge={getBreakBadge(staffId)}
-                      chipClassName={isShiftEnded(staffId) ? "opacity-40 grayscale" : ""}
+                      enabled={canEdit && !isAbsent(staffId)}
+                      badge={getChipBadge(staffId)}
+                      chipClassName={[
+                        isShiftEnded(staffId) ? "opacity-40 grayscale" : "",
+                        isAbsent(staffId) ? "opacity-40 grayscale" : "",
+                      ].join(" ")}
                       onClick={() => canEdit && setSelectedStaffId(staffId)}
                     />
                   ))}
@@ -572,6 +623,7 @@ export function MapperGrid({
             areaId="free"
             title="フリー"
             count={(staffByAreaId["free"] ?? []).length}
+            countLabel={countLabelFor("free")}
             disabled={!canEdit}
             size="xl"
           >
@@ -580,9 +632,12 @@ export function MapperGrid({
                 key={staffId}
                 staffId={staffId}
                 staff={staffById[staffId]!}
-                enabled={canEdit}
-                badge={getBreakBadge(staffId)}
-                chipClassName={isShiftEnded(staffId) ? "opacity-40 grayscale" : ""}
+                enabled={canEdit && !isAbsent(staffId)}
+                badge={getChipBadge(staffId)}
+                chipClassName={[
+                  isShiftEnded(staffId) ? "opacity-40 grayscale" : "",
+                  isAbsent(staffId) ? "opacity-40 grayscale" : "",
+                ].join(" ")}
                 onClick={() => canEdit && setSelectedStaffId(staffId)}
               />
             ))}
@@ -592,6 +647,7 @@ export function MapperGrid({
             areaId="break"
             title="休憩"
             count={(staffByAreaId["break"] ?? []).length}
+            countLabel={countLabelFor("break")}
             disabled={!canEdit}
             size="xl"
           >
@@ -600,9 +656,12 @@ export function MapperGrid({
                 key={staffId}
                 staffId={staffId}
                 staff={staffById[staffId]!}
-                enabled={canEdit}
-                badge={getBreakBadge(staffId)}
-                chipClassName={isShiftEnded(staffId) ? "opacity-40 grayscale" : ""}
+                enabled={canEdit && !isAbsent(staffId)}
+                badge={getChipBadge(staffId)}
+                chipClassName={[
+                  isShiftEnded(staffId) ? "opacity-40 grayscale" : "",
+                  isAbsent(staffId) ? "opacity-40 grayscale" : "",
+                ].join(" ")}
                 onClick={() => canEdit && setSelectedStaffId(staffId)}
               />
             ))}
