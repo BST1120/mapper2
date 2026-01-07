@@ -23,7 +23,9 @@ export function staffDocRef(tenantId: string, staffId: string) {
 }
 
 export function dayStateDocRef(tenantId: string, date: string) {
-  return doc(getFirestoreDb(), "tenants", tenantId, "days", date, "state");
+  // Firestore paths must alternate collection/doc segments.
+  // We store day state at: tenants/{tenantId}/days/{date}/meta/state
+  return doc(getFirestoreDb(), "tenants", tenantId, "days", date, "meta", "state");
 }
 
 export function assignmentsColRef(tenantId: string, date: string) {

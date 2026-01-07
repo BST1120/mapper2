@@ -23,7 +23,7 @@ service cloud.firestore {
       match /days/{date} {
         allow read: if authed();
 
-        match /state {
+        match /meta/{docId} {
           allow read: if authed();
           allow write: if authed();
         }
