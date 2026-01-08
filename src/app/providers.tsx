@@ -10,6 +10,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      if (!cancelled && !uid && !error) {
+        setError("接続がタイムアウトしました（ネットワーク/ブラウザの制限の可能性）。");
+      }
+    }, 12000);
     ensureAnonymousAuth()
       .then(({ uid }) => {
         if (!cancelled) setUid(uid);
@@ -20,8 +25,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
       });
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
-  }, []);
+  }, [uid, error]);
 
   return (
     <div className="min-h-dvh">

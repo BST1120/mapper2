@@ -16,7 +16,7 @@ import {
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useDraggable,
   useDroppable,
@@ -236,7 +236,8 @@ export function MapperGrid({
   editLocked,
 }: MapperGridProps) {
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // Desktop向け（iOS/AndroidはPointerEventがTouchとして来ることがあり、Sensor競合しやすい）
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     // iPad/Safari向け
     useSensor(TouchSensor, {
       // long-pressが苦手な場合が多いので「一定距離動かす」で開始
