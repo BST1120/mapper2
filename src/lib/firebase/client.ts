@@ -43,11 +43,18 @@ export function getFirestoreDb(): Firestore {
   // 自動でLong Pollingに切り替えられる設定にする。
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
   const isAmazonTablet = /Silk|Kindle|KF[A-Z0-9]+|AmazonWebAppPlatform/i.test(ua);
-  db = initializeFirestore(getFirebaseApp(), {
-    experimentalAutoDetectLongPolling: true,
-    // Fireタブレットで無限ロードになるケース対策（WebChannelが不安定）
-    experimentalForceLongPolling: isAmazonTablet,
-  });
+  db = initializeFirestore(
+    getFirebaseApp(),
+    isAmazonTablet
+      ? {
+          // Fireタブレットで無限ロードになるケース対策（WebChannelが不安定）
+          // NOTE: forceLongPolling と autoDetectLongPolling は同時に使えない。
+          experimentalForceLongPolling: true,
+        }
+      : {
+          experimentalAutoDetectLongPolling: true,
+        },
+  );
 
   // Persistence is best-effort; allow disabling for troublesome tablets.
   const disablePersistence =
