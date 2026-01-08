@@ -549,7 +549,11 @@ export function AdminImportClient() {
                     start = t.start;
                     end = t.end;
                   } else if (code.kind === "code") {
-                    workType = code.code;
+                    // 正職（可変）はExcelコードを採用。固定は既定コードを優先。
+                    const isFixed = (staff.shiftMode ?? "variable") === "fixed";
+                    workType = isFixed
+                      ? (staff.shiftCodeDefault || staff.workTypeDefault || "C")
+                      : code.code;
                     const st = resolveShiftType(shiftTypesByCode, workType);
                     if (!st) continue; // unknown code -> skip
                     start = st.start;

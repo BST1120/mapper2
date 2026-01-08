@@ -4,11 +4,13 @@ import type { Area as AreaDoc } from "@/lib/firebase/schema";
 import type { Assignment, Shift, Staff } from "@/lib/firebase/schema";
 import { buildDisplayName } from "@/lib/staff/displayName";
 import { ensureAnonymousAuth } from "@/lib/firebase/client";
+import { dateAtLocal } from "@/lib/date/localTime";
 import {
   assignmentDocRef,
   auditLogsColRef,
   dayStateDocRef,
   shiftDocRef,
+  shiftTypeDocRef,
 } from "@/lib/firebase/refs";
 import {
   DndContext,
@@ -370,6 +372,32 @@ export function MapperGrid({
     });
   }
 
+  async function setShiftCodeForDay(staffId: string, nextCode: string) {
+    if (!canEdit) return;
+    await ensureAnonymousAuth();
+    setBanner(null);
+
+    const stSnap = await getDoc(shiftTypeDocRef(tenantId, nextCode));
+    if (!stSnap.exists()) {
+      setBanner(`勤務形態コードが見つかりません: ${nextCode}`);
+      return;
+    }
+    const st = stSnap.data() as { start: string; end: string };
+
+    const shiftRef = shiftDocRef(tenantId, date, staffId);
+    await setDoc(
+      shiftRef,
+      {
+        workType: nextCode,
+        startAt: Timestamp.fromDate(dateAtLocal(date, st.start)) as unknown,
+        endAt: Timestamp.fromDate(dateAtLocal(date, st.end)) as unknown,
+        absent: false,
+        source: "manual",
+      },
+      { merge: true },
+    );
+  }
+
   async function endBreak(staffId: string) {
     if (!canEdit) return;
     await ensureAnonymousAuth();
@@ -532,6 +560,20 @@ export function MapperGrid({
               >
                 {isAbsent(selectedStaffId) ? "欠勤解除" : "欠勤にする"}
               </button>
+              <label className="inline-flex items-center gap-2 text-sm text-zinc-600">
+                <span>勤務形態</span>
+                <input
+                  className="w-20 rounded-lg border px-2 py-1 text-sm"
+                  placeholder="例: D1"
+                  onKeyDown={(e) => {
+                    if (e.key !== "Enter") return;
+                    const v = (e.currentTarget.value || "").trim().toUpperCase();
+                    if (!v) return;
+                    void setShiftCodeForDay(selectedStaffId, v);
+                  }}
+                />
+                <span className="text-xs text-zinc-500">Enterで更新</span>
+              </label>
               <button
                 className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50"
                 onClick={() => setSelectedStaffId(null)}

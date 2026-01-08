@@ -22,6 +22,7 @@ export function AdminStaffClient() {
   const [firstInitial, setFirstInitial] = useState("");
   const [breakPattern, setBreakPattern] = useState<Staff["breakPattern"]>("30_30");
   const [shiftCodeDefault, setShiftCodeDefault] = useState("C");
+  const [shiftMode, setShiftMode] = useState<NonNullable<Staff["shiftMode"]>>("variable");
   const [showOnMapper, setShowOnMapper] = useState(true);
   const [showOnTimeline, setShowOnTimeline] = useState(true);
   const [status, setStatus] = useState("");
@@ -81,6 +82,17 @@ export function AdminStaffClient() {
               ))}
             </select>
           </label>
+          <label className="grid gap-1">
+            <span className="text-xs text-zinc-600">勤務モード</span>
+            <select
+              className="rounded-lg border px-3 py-2"
+              value={shiftMode}
+              onChange={(e) => setShiftMode(e.target.value as NonNullable<Staff["shiftMode"]>)}
+            >
+              <option value="variable">正職（Excelコードで可変）</option>
+              <option value="fixed">固定（毎回同じ）</option>
+            </select>
+          </label>
           <label className="flex items-center gap-2 text-sm text-zinc-700">
             <input type="checkbox" checked={showOnMapper} onChange={(e) => setShowOnMapper(e.target.checked)} />
             マッパーに表示
@@ -107,6 +119,7 @@ export function AdminStaffClient() {
                   firstInitial: init || "X",
                   active: true,
                   breakPattern,
+                  shiftMode,
                   shiftCodeDefault,
                   showOnMapper,
                   showOnTimeline,
@@ -138,6 +151,7 @@ export function AdminStaffClient() {
             <thead className="bg-zinc-50 text-zinc-700">
               <tr>
                 <th className="p-2 text-left">表示名</th>
+                <th className="p-2 text-left">勤務モード</th>
                 <th className="p-2 text-left">勤務形態</th>
                 <th className="p-2 text-left">休憩</th>
                 <th className="p-2 text-left">表示</th>
@@ -147,6 +161,23 @@ export function AdminStaffClient() {
               {list.map(({ id, staff }) => (
                 <tr key={id} className="border-t">
                   <td className="p-2 font-medium">{buildDisplayName(staff)}</td>
+                  <td className="p-2">
+                    <select
+                      className="rounded-lg border px-2 py-1"
+                      value={staff.shiftMode ?? "variable"}
+                      onChange={async (e) => {
+                        const next = e.target.value as NonNullable<Staff["shiftMode"]>;
+                        await setDoc(
+                          staffDocRef(tenantId, id),
+                          { shiftMode: next, updatedAt: serverTimestamp() as unknown },
+                          { merge: true },
+                        );
+                      }}
+                    >
+                      <option value="variable">正職（可変）</option>
+                      <option value="fixed">固定</option>
+                    </select>
+                  </td>
                   <td className="p-2">
                     <select
                       className="rounded-lg border px-2 py-1"

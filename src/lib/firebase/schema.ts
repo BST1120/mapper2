@@ -86,6 +86,12 @@ export type Staff = {
   showOnMapper?: boolean;
   showOnTimeline?: boolean;
   /**
+   * シフトの決まり方
+   * - variable: 正職など。Excelの勤務コードで日々変わる
+   * - fixed: パートなど。出勤日は毎回同じ勤務形態（shiftCodeDefault）
+   */
+  shiftMode?: "variable" | "fixed";
+  /**
    * 既定の勤務形態コード（ShiftType.code）
    * 例: A, D1, K, L1 ...
    */
