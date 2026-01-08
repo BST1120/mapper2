@@ -42,7 +42,14 @@ export type DayState = {
 
 export type AuditLog = {
   timestamp: unknown;
-  type: "move" | "lock" | "unlock" | "break_start" | "break_end" | "import";
+  type:
+    | "move"
+    | "lock"
+    | "unlock"
+    | "break_start"
+    | "break_end"
+    | "break_cancel"
+    | "import";
   staffId?: string;
   fromAreaId?: string;
   toAreaId?: string;

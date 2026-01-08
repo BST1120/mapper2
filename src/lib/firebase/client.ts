@@ -39,11 +39,22 @@ export function getFirebaseAuth(): Auth {
 export function getFirestoreDb(): Firestore {
   if (db) return db;
   // Enable offline persistence by default (best-effort).
-  db = initializeFirestore(getFirebaseApp(), {});
-  enableIndexedDbPersistence(db).catch(() => {
-    // Common causes: multiple tabs, unsupported browser.
-    // For MVP, we treat this as best-effort.
+  // Safari/iPad/一部AndroidでWebChannelが不安定なことがあるため、
+  // 自動でLong Pollingに切り替えられる設定にする。
+  db = initializeFirestore(getFirebaseApp(), {
+    experimentalAutoDetectLongPolling: true,
   });
+
+  // Persistence is best-effort; allow disabling for troublesome tablets.
+  const disablePersistence =
+    typeof window !== "undefined" &&
+    window.localStorage?.getItem("disableFirestorePersistence") === "1";
+  if (!disablePersistence) {
+    enableIndexedDbPersistence(db).catch(() => {
+      // Common causes: multiple tabs, unsupported browser.
+      // For MVP, we treat this as best-effort.
+    });
+  }
   return db;
 }
 

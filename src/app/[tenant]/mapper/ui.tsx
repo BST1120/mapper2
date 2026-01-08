@@ -247,6 +247,7 @@ export function MapperGrid({
   const [activeStaffId, setActiveStaffId] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
   const [showAbsent, setShowAbsent] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const staffByAreaId = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -406,6 +407,48 @@ export function MapperGrid({
     });
   }
 
+  function hasActiveBreak(staffId: string): boolean {
+    const shift = shiftsByStaffId[staffId];
+    const slots = shift?.breakSlots ?? [];
+    return slots.some((s) => Boolean(s.used && s.startedAt && !s.endedAt));
+  }
+
+  async function cancelActiveBreak(staffId: string) {
+    if (!canEdit) return;
+    await ensureAnonymousAuth();
+    setBanner(null);
+
+    const shiftRef = shiftDocRef(tenantId, date, staffId);
+    try {
+      await runTransaction(shiftRef.firestore, async (tx) => {
+        const snap = await tx.get(shiftRef);
+        const cur = snap.data() as Shift | undefined;
+        if (!cur) throw new Error("SHIFT_MISSING");
+        const slots = [...(cur.breakSlots ?? [])];
+        // cancel the latest started (used && startedAt && not endedAt)
+        const idx = [...slots]
+          .map((s, i) => ({ s, i }))
+          .reverse()
+          .find((x) => x.s.used && x.s.startedAt && !x.s.endedAt)?.i;
+        if (idx == null) return;
+        const prev = slots[idx]!;
+        slots[idx] = { minutes: prev.minutes, used: false };
+        tx.update(shiftRef, { breakSlots: slots });
+      });
+    } catch (e: unknown) {
+      setBanner(e instanceof Error ? e.message : "休憩取消に失敗しました。");
+      return;
+    }
+
+    // Move back to free (MVP)
+    await moveStaff(staffId, "free");
+    void addDoc(auditLogsColRef(tenantId, date), {
+      timestamp: serverTimestamp() as unknown,
+      type: "break_cancel",
+      staffId,
+    });
+  }
+
   async function setShiftCodeForDay(staffId: string, nextCode: string) {
     if (!canEdit) return;
     await ensureAnonymousAuth();
@@ -505,6 +548,8 @@ export function MapperGrid({
         fromAreaId,
         toAreaId,
       });
+      // 移動後は選択解除（誤操作で入れ替わるのを防ぐ）
+      setSelectedStaffId(null);
     } catch (e: unknown) {
       if (e instanceof Error && e.message === "CONFLICT") {
         setBanner("競合: 他の端末が先に同じ職員を動かしました。最新の配置に更新しました。");
@@ -623,6 +668,13 @@ export function MapperGrid({
               </button>
               <button
                 className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50 disabled:opacity-50"
+                disabled={!canEdit || !hasActiveBreak(selectedStaffId)}
+                onClick={() => void cancelActiveBreak(selectedStaffId)}
+              >
+                休憩取消（バッジ回復）
+              </button>
+              <button
+                className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50 disabled:opacity-50"
                 disabled={!canEdit}
                 onClick={() => void endBreak(selectedStaffId)}
               >
@@ -678,9 +730,11 @@ export function MapperGrid({
             sensors={sensors}
             onDragStart={(e: DragStartEvent) => {
               setActiveStaffId(String(e.active.id));
+              setIsDragging(true);
             }}
             onDragEnd={async (e: DragEndEvent) => {
               setActiveStaffId(null);
+              setIsDragging(false);
               if (!canEdit) return;
               const staffId = String(e.active.id);
               const overId = e.over?.id ? String(e.over.id) : null;
@@ -699,7 +753,7 @@ export function MapperGrid({
                     disabled={!canEdit}
                     size="sm"
                     onClick={
-                      canEdit && selectedStaffId
+                      canEdit && selectedStaffId && !isDragging
                         ? () => void moveStaff(selectedStaffId, slot.id)
                         : undefined
                     }
@@ -732,7 +786,7 @@ export function MapperGrid({
                     disabled={!canEdit}
                     size="md"
                     onClick={
-                      canEdit && selectedStaffId
+                      canEdit && selectedStaffId && !isDragging
                         ? () => void moveStaff(selectedStaffId, slot.id)
                         : undefined
                     }
@@ -764,7 +818,7 @@ export function MapperGrid({
                   disabled={!canEdit}
                   size="lg"
                   onClick={
-                    canEdit && selectedStaffId
+                    canEdit && selectedStaffId && !isDragging
                       ? () => void moveStaff(selectedStaffId, bottomRow.id)
                       : undefined
                   }
@@ -807,7 +861,9 @@ export function MapperGrid({
             disabled={!canEdit}
             size="xl"
             onClick={
-              canEdit && selectedStaffId ? () => void moveStaff(selectedStaffId, "free") : undefined
+              canEdit && selectedStaffId && !isDragging
+                ? () => void moveStaff(selectedStaffId, "free")
+                : undefined
             }
           >
             {(staffByAreaId["free"] ?? []).map((staffId) => (
@@ -834,7 +890,7 @@ export function MapperGrid({
             disabled={!canEdit}
             size="xl"
             onClick={
-              canEdit && selectedStaffId
+              canEdit && selectedStaffId && !isDragging
                 ? () => void moveStaff(selectedStaffId, "break")
                 : undefined
             }
