@@ -68,9 +68,13 @@ export async function ensureAnonymousAuth(): Promise<{ uid: string }> {
   const current = a.currentUser;
   if (current?.uid) return { uid: current.uid };
 
-  // Wait one tick for any existing session restoration.
+  // Wait briefly for any existing session restoration.
+  // Some browsers (notably some tablet WebViews) can fail to invoke the callback,
+  // which would otherwise hang forever. In that case, fall back to sign-in.
   const restored = await new Promise<string | null>((resolve) => {
+    const timer = window.setTimeout(() => resolve(null), 1500);
     const unsub = onAuthStateChanged(a, (user) => {
+      window.clearTimeout(timer);
       unsub();
       resolve(user?.uid ?? null);
     });
