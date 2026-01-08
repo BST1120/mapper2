@@ -89,8 +89,8 @@ export function AdminStaffClient() {
               value={shiftMode}
               onChange={(e) => setShiftMode(e.target.value as NonNullable<Staff["shiftMode"]>)}
             >
-              <option value="variable">正職（Excelコードで可変）</option>
-              <option value="fixed">固定（毎回同じ）</option>
+              <option value="variable">正職（A〜FなどをExcelで可変）</option>
+              <option value="fixed">パート（毎回同じ勤務形態）</option>
             </select>
           </label>
           <label className="flex items-center gap-2 text-sm text-zinc-700">
@@ -175,7 +175,7 @@ export function AdminStaffClient() {
                       }}
                     >
                       <option value="variable">正職（可変）</option>
-                      <option value="fixed">固定</option>
+                      <option value="fixed">パート（固定）</option>
                     </select>
                   </td>
                   <td className="p-2">

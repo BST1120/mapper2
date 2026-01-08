@@ -5,6 +5,7 @@ import type { Assignment, Shift, Staff } from "@/lib/firebase/schema";
 import { buildDisplayName } from "@/lib/staff/displayName";
 import { ensureAnonymousAuth } from "@/lib/firebase/client";
 import { dateAtLocal } from "@/lib/date/localTime";
+import { formatDateYYYYMMDD } from "@/lib/date/today";
 import {
   assignmentDocRef,
   auditLogsColRef,
@@ -90,6 +91,19 @@ function StaffChip({ staff }: { staff: Staff }) {
       <div className="font-medium leading-4">{name}</div>
     </div>
   );
+}
+
+function breakSlotsFor(staff: Staff): Shift["breakSlots"] {
+  if (staff.breakPattern === "15_30") {
+    return [
+      { minutes: 15, used: false },
+      { minutes: 30, used: false },
+    ];
+  }
+  return [
+    { minutes: 30, used: false },
+    { minutes: 30, used: false },
+  ];
 }
 
 function areaNameFrom(areasById: Record<string, AreaDoc> | null | undefined, slot: AreaSlot) {
@@ -300,6 +314,19 @@ export function MapperGrid({
     return `${pad(sd.getHours())}:${pad(sd.getMinutes())}〜${pad(ed.getHours())}:${pad(ed.getMinutes())}`;
   }
 
+  function hhmmNow(): string {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function hhmmFromTs(ts: Timestamp | undefined): string | null {
+    if (!ts?.toDate) return null;
+    const d = ts.toDate();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
   async function setAbsent(staffId: string, absent: boolean) {
     if (!canEdit) return;
     await ensureAnonymousAuth();
@@ -334,7 +361,8 @@ export function MapperGrid({
     }
     const now = Date.now();
     if (now > endMs - 30 * 60 * 1000) {
-      setBanner("退勤30分前以降は休憩を開始できません。");
+      const endLabel = hhmmFromTs(endAt) ?? "??:??";
+      setBanner(`退勤30分前以降は休憩を開始できません。（退勤:${endLabel} / 現在:${hhmmNow()}）`);
       return;
     }
 
@@ -385,6 +413,7 @@ export function MapperGrid({
     const st = stSnap.data() as { start: string; end: string };
 
     const shiftRef = shiftDocRef(tenantId, date, staffId);
+    const staff = staffById[staffId];
     await setDoc(
       shiftRef,
       {
@@ -392,6 +421,7 @@ export function MapperGrid({
         startAt: Timestamp.fromDate(dateAtLocal(date, st.start)) as unknown,
         endAt: Timestamp.fromDate(dateAtLocal(date, st.end)) as unknown,
         absent: false,
+        breakSlots: staff ? breakSlotsFor(staff) : [],
         source: "manual",
       },
       { merge: true },
@@ -505,13 +535,20 @@ export function MapperGrid({
               <span className="font-medium text-emerald-700">編集可</span>
             )}
           </div>
+          <div className="text-xs text-zinc-500">
+            日付: <span className="font-medium">{date}</span>
+            {date !== formatDateYYYYMMDD(new Date()) ? (
+              <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-amber-900">
+                ※今日ではありません
+              </span>
+            ) : null}
+          </div>
           <button
             className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50"
             onClick={() => toggleLock(!editLocked)}
           >
             {editLocked ? "ロック解除" : "ロックする"}
           </button>
-          <div className="text-xs text-zinc-500">日付: {date}</div>
           <label className="ml-2 inline-flex items-center gap-2 text-sm text-zinc-600">
             <input
               type="checkbox"
@@ -539,6 +576,37 @@ export function MapperGrid({
               <div className="text-xs text-zinc-500">
                 D&Dできない時: ロック解除＋少し動かしてドラッグ（iPadは指を動かす）
               </div>
+              <label className="inline-flex items-center gap-2 text-sm text-zinc-600">
+                <span>タップ移動</span>
+                <select
+                  className="rounded-lg border px-2 py-1 text-sm"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (!v) return;
+                    void moveStaff(selectedStaffId, v);
+                    e.currentTarget.value = "";
+                  }}
+                >
+                  <option value="">移動先を選択…</option>
+                  <option value="free">フリー</option>
+                  <option value="break">休憩</option>
+                  {topRow.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {areaNameFrom(areasById ?? null, s)}
+                    </option>
+                  ))}
+                  {midRow.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {areaNameFrom(areasById ?? null, s)}
+                    </option>
+                  ))}
+                  <option value={bottomRow.id}>
+                    {areaNameFrom(areasById ?? null, bottomRow)}
+                  </option>
+                </select>
+                <span className="text-xs text-zinc-500">選ぶと即移動</span>
+              </label>
               <button
                 className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50 disabled:opacity-50"
                 disabled={!canEdit}
@@ -584,7 +652,10 @@ export function MapperGrid({
           ) : null}
         </div>
       ) : (
-        <div className="text-xs text-zinc-500">日付: {date}</div>
+        <div className="rounded-xl border bg-zinc-50 p-3 text-sm text-zinc-700">
+          ここは<strong>閲覧モード</strong>です（移動・休憩操作はできません）。編集は<strong>管理者用URL</strong>で行ってください。
+          <div className="mt-1 text-xs text-zinc-500">日付: {date}</div>
+        </div>
       )}
 
       {banner ? (
