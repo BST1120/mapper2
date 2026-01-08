@@ -41,15 +41,19 @@ export function getFirestoreDb(): Firestore {
   // Enable offline persistence by default (best-effort).
   // Safari/iPad/一部AndroidでWebChannelが不安定なことがあるため、
   // 自動でLong Pollingに切り替えられる設定にする。
+  const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const isAmazonTablet = /Silk|Kindle|KF[A-Z0-9]+|AmazonWebAppPlatform/i.test(ua);
   db = initializeFirestore(getFirebaseApp(), {
     experimentalAutoDetectLongPolling: true,
+    // Fireタブレットで無限ロードになるケース対策（WebChannelが不安定）
+    experimentalForceLongPolling: isAmazonTablet,
   });
 
   // Persistence is best-effort; allow disabling for troublesome tablets.
   const disablePersistence =
     typeof window !== "undefined" &&
     window.localStorage?.getItem("disableFirestorePersistence") === "1";
-  if (!disablePersistence) {
+  if (!disablePersistence && !isAmazonTablet) {
     enableIndexedDbPersistence(db).catch(() => {
       // Common causes: multiple tabs, unsupported browser.
       // For MVP, we treat this as best-effort.
