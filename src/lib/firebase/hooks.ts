@@ -1,17 +1,26 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { onSnapshot, orderBy, query, setDoc } from "firebase/firestore";
+import { limit, onSnapshot, orderBy, query, setDoc } from "firebase/firestore";
 
 import {
   areasColRef,
   assignmentsColRef,
+  auditLogsColRef,
   dayStateDocRef,
   shiftTypesColRef,
   shiftsColRef,
   staffColRef,
 } from "@/lib/firebase/refs";
-import type { Area, Assignment, DayState, Shift, ShiftType, Staff } from "@/lib/firebase/schema";
+import type {
+  Area,
+  Assignment,
+  AuditLog,
+  DayState,
+  Shift,
+  ShiftType,
+  Staff,
+} from "@/lib/firebase/schema";
 
 export function useAreas(tenantId: string) {
   const [areasById, setAreasById] = useState<Record<string, Area> | null>(null);
@@ -176,5 +185,31 @@ export function useShiftTypes(tenantId: string) {
   }, [q]);
 
   return { shiftTypesByCode, error };
+}
+
+export function useAuditLogs(tenantId: string, date: string, limitCount = 200) {
+  const [logs, setLogs] = useState<Array<{ id: string; log: AuditLog }> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const q = useMemo(() => {
+    const col = auditLogsColRef(tenantId, date);
+    // timestamp is always set by our writers; order descending for newest-first.
+    return query(col, orderBy("timestamp", "desc"), limit(limitCount));
+  }, [tenantId, date, limitCount]);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const next: Array<{ id: string; log: AuditLog }> = [];
+        snap.forEach((d) => next.push({ id: d.id, log: d.data() as AuditLog }));
+        setLogs(next);
+      },
+      (e) => setError(e instanceof Error ? e.message : "Failed to load audit logs"),
+    );
+    return () => unsub();
+  }, [q]);
+
+  return { logs, error };
 }
 
