@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { serverTimestamp, setDoc } from "firebase/firestore";
+import { deleteDoc, serverTimestamp, setDoc } from "firebase/firestore";
 
 import { staffDocRef } from "@/lib/firebase/refs";
 import { useShiftTypes, useStaff } from "@/lib/firebase/hooks";
 import { buildDisplayName, normalizeInitial } from "@/lib/staff/displayName";
 import type { Staff } from "@/lib/firebase/schema";
+import { ensureAnonymousAuth } from "@/lib/firebase/client";
 
 export function AdminStaffClient() {
   const params = useParams<{ tenant: string; editKey: string }>();
@@ -155,6 +156,7 @@ export function AdminStaffClient() {
                 <th className="p-2 text-left">勤務形態</th>
                 <th className="p-2 text-left">休憩</th>
                 <th className="p-2 text-left">表示</th>
+                <th className="p-2 text-left">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -244,6 +246,33 @@ export function AdminStaffClient() {
                       />
                       タイムバー
                     </label>
+                  </td>
+                  <td className="p-2">
+                    <button
+                      className="rounded-lg border bg-white px-2 py-1 text-xs text-red-700 hover:bg-red-50 disabled:opacity-50"
+                      disabled={busy}
+                      onClick={async () => {
+                        const name = buildDisplayName(staff);
+                        const ok = window.confirm(
+                          `${name} を削除しますか？\n\n※過去のシフト/履歴データは残ります（表示されなくなるだけです）。`,
+                        );
+                        if (!ok) return;
+                        setBusy(true);
+                        setStatus("");
+                        try {
+                          await ensureAnonymousAuth();
+                          await deleteDoc(staffDocRef(tenantId, id));
+                          setStatus(`${name} を削除しました。`);
+                        } catch (e: unknown) {
+                          setStatus(e instanceof Error ? e.message : "削除に失敗しました。");
+                        } finally {
+                          setBusy(false);
+                        }
+                      }}
+                      type="button"
+                    >
+                      削除
+                    </button>
                   </td>
                 </tr>
               ))}
