@@ -155,7 +155,7 @@ export function AdminImportClient() {
   const [mode, setMode] = useState<"single" | "range">("range");
   const [singleDate, setSingleDate] = useState(formatDateYYYYMMDD(new Date()));
 
-  // manual mapping selections (excelName -> staffId)
+  // manual mapping selections (rowKey -> staffId)
   const [nameMap, setNameMap] = useState<Record<string, string>>({});
 
   const staffIndex = useMemo(() => {
@@ -201,8 +201,9 @@ export function AdminImportClient() {
 
     return parsed.rows.map((r) => {
       const excelName = r.name;
+      const rowKey = `${r.row}:${excelName}`;
       const norm = normalizeName(excelName);
-      const explicit = nameMap[excelName];
+      const explicit = nameMap[rowKey];
       if (explicit) return { row: r.row, excelName, staffId: explicit, status: "ok" };
 
       const full = staffIndex.fullIndex[norm];
@@ -218,6 +219,17 @@ export function AdminImportClient() {
       return { row: r.row, excelName, status: "unmatched" };
     });
   }, [parsed, staffById, staffIndex, nameMap]);
+
+  const parsedRowRange = useMemo(() => {
+    if (!parsed?.rows?.length) return null;
+    let min = Number.POSITIVE_INFINITY;
+    let max = 0;
+    for (const r of parsed.rows) {
+      if (r.row < min) min = r.row;
+      if (r.row > max) max = r.row;
+    }
+    return { min, max, count: parsed.rows.length };
+  }, [parsed]);
 
   return (
     <div className="rounded-xl border bg-white p-4">
@@ -412,6 +424,10 @@ export function AdminImportClient() {
                 見出し列: {numberToCol(colToNumber(dateStartCol))}〜
                 {dateEndCol ? dateEndCol.toUpperCase() : "（自動）"}
               </div>
+              <div className="mt-1 text-xs text-zinc-500">
+                データ行指定: {dataStartRow}〜{dataEndRow ? dataEndRow : "（最後まで）"} / 読み取った行範囲:{" "}
+                {parsedRowRange ? `${parsedRowRange.min}〜${parsedRowRange.max}（${parsedRowRange.count}行）` : "（なし）"}
+              </div>
               <div className="mt-1">
                 検出できた日付の例:{" "}
                 <span className="font-medium">
@@ -440,6 +456,7 @@ export function AdminImportClient() {
             <table className="w-full min-w-[860px] text-sm">
               <thead className="bg-zinc-50 text-zinc-700">
                 <tr>
+                  <th className="p-2 text-left">行</th>
                   <th className="p-2 text-left">Excel氏名</th>
                   <th className="p-2 text-left">職員（Firestore）</th>
                   <th className="p-2 text-left">状態</th>
@@ -449,16 +466,18 @@ export function AdminImportClient() {
                 {previewRows.slice(0, 60).map((r) => {
                   const needsSelect = r.status !== "ok";
                   const excelName = r.excelName;
+                  const rowKey = `${r.row}:${excelName}`;
                   return (
-                    <tr key={`${r.row}-${excelName}`} className="border-t">
+                    <tr key={rowKey} className="border-t">
+                      <td className="p-2 text-zinc-500">{r.row}</td>
                       <td className="p-2">{excelName}</td>
                       <td className="p-2">
                         <select
                           className="w-full rounded-lg border px-2 py-1"
-                          value={nameMap[excelName] ?? r.staffId ?? ""}
+                          value={nameMap[rowKey] ?? r.staffId ?? ""}
                           onChange={(e) => {
                             const v = e.target.value;
-                            setNameMap((prev) => ({ ...prev, [excelName]: v }));
+                            setNameMap((prev) => ({ ...prev, [rowKey]: v }));
                           }}
                         >
                           <option value="">（未選択）</option>
@@ -503,8 +522,9 @@ export function AdminImportClient() {
               await ensureAnonymousAuth();
 
               // Build staffId resolver
-              const resolveStaffId = (excelName: string): string | null => {
-                if (nameMap[excelName]) return nameMap[excelName]!;
+              const resolveStaffId = (row: number, excelName: string): string | null => {
+                const rowKey = `${row}:${excelName}`;
+                if (nameMap[rowKey]) return nameMap[rowKey]!;
                 const norm = normalizeName(excelName);
                 const full = staffIndex.fullIndex[norm];
                 if (full?.length === 1) return full[0]!;
@@ -523,7 +543,7 @@ export function AdminImportClient() {
               }> = [];
 
               for (const row of parsed.rows) {
-                const staffId = resolveStaffId(row.name);
+                const staffId = resolveStaffId(row.row, row.name);
                 if (!staffId) continue;
                 const staff = staffById[staffId];
                 if (!staff) continue;
