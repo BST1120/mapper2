@@ -170,6 +170,7 @@ function DroppableArea({
   disabled,
   children,
   size = "md",
+  onClick,
 }: {
   areaId: string;
   title: string;
@@ -178,6 +179,7 @@ function DroppableArea({
   disabled: boolean;
   children: React.ReactNode;
   size?: "sm" | "md" | "lg" | "xl";
+  onClick?: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: areaId, disabled });
 
@@ -199,9 +201,11 @@ function DroppableArea({
   return (
     <section
       ref={setNodeRef}
+      onClick={onClick}
       className={[
         "rounded-xl border bg-white p-3",
         isOver && !disabled ? "ring-2 ring-emerald-400" : "",
+        onClick && !disabled ? "cursor-pointer hover:bg-zinc-50" : "",
       ].join(" ")}
     >
       <div className="flex items-center justify-between">
@@ -385,7 +389,8 @@ export function MapperGrid({
       nextSlots[i] = {
         ...nextSlots[i]!,
         used: true,
-        startedAt: serverTimestamp() as unknown,
+        // Firestore doesn't support serverTimestamp() inside array elements.
+        startedAt: Timestamp.now() as unknown,
       };
       tx.update(shiftRef, { breakSlots: nextSlots });
     });
@@ -442,7 +447,8 @@ export function MapperGrid({
         const slots = [...(cur.breakSlots ?? [])];
         const idx = slots.findIndex((s) => s.used && !s.endedAt);
         if (idx === -1) return; // nothing to end
-        slots[idx] = { ...slots[idx]!, endedAt: serverTimestamp() as unknown };
+        // Firestore doesn't support serverTimestamp() inside array elements.
+        slots[idx] = { ...slots[idx]!, endedAt: Timestamp.now() as unknown };
         tx.update(shiftRef, { breakSlots: slots });
       });
     } catch (e: unknown) {
@@ -691,6 +697,11 @@ export function MapperGrid({
                     countLabel={countLabelFor(slot.id)}
                     disabled={!canEdit}
                     size="sm"
+                    onClick={
+                      canEdit && selectedStaffId
+                        ? () => void moveStaff(selectedStaffId, slot.id)
+                        : undefined
+                    }
                   >
                     {(staffByAreaId[slot.id] ?? []).map((staffId) => (
                       <DraggableStaff
@@ -719,6 +730,11 @@ export function MapperGrid({
                     countLabel={countLabelFor(slot.id)}
                     disabled={!canEdit}
                     size="md"
+                    onClick={
+                      canEdit && selectedStaffId
+                        ? () => void moveStaff(selectedStaffId, slot.id)
+                        : undefined
+                    }
                   >
                     {(staffByAreaId[slot.id] ?? []).map((staffId) => (
                       <DraggableStaff
@@ -746,6 +762,11 @@ export function MapperGrid({
                   countLabel={countLabelFor(bottomRow.id)}
                   disabled={!canEdit}
                   size="lg"
+                  onClick={
+                    canEdit && selectedStaffId
+                      ? () => void moveStaff(selectedStaffId, bottomRow.id)
+                      : undefined
+                  }
                 >
                   {(staffByAreaId[bottomRow.id] ?? []).map((staffId) => (
                     <DraggableStaff
@@ -784,6 +805,9 @@ export function MapperGrid({
             countLabel={countLabelFor("free")}
             disabled={!canEdit}
             size="xl"
+            onClick={
+              canEdit && selectedStaffId ? () => void moveStaff(selectedStaffId, "free") : undefined
+            }
           >
             {(staffByAreaId["free"] ?? []).map((staffId) => (
               <DraggableStaff
@@ -808,6 +832,11 @@ export function MapperGrid({
             countLabel={countLabelFor("break")}
             disabled={!canEdit}
             size="xl"
+            onClick={
+              canEdit && selectedStaffId
+                ? () => void moveStaff(selectedStaffId, "break")
+                : undefined
+            }
           >
             {(staffByAreaId["break"] ?? []).map((staffId) => (
               <DraggableStaff
