@@ -214,13 +214,20 @@ export function MapperGrid({
   shiftsByStaffId,
   editLocked,
 }: MapperGridProps) {
-  const sensors = useSensors(useSensor(PointerSensor));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+  );
   const [activeStaffId, setActiveStaffId] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
+  const [showAbsent, setShowAbsent] = useState(false);
 
   const staffByAreaId = useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const [staffId] of Object.entries(staffById)) {
+      const shift = shiftsByStaffId[staffId];
+      // その日シフトが無い職員は表示しない（当日出勤者のみ）
+      if (!shift) continue;
+      if (shift.absent && !showAbsent) continue;
       const a = assignmentsByStaffId[staffId];
       const areaId = a?.areaId ?? "free";
       map[areaId] ??= [];
@@ -237,7 +244,7 @@ export function MapperGrid({
       });
     }
     return map;
-  }, [assignmentsByStaffId, staffById]);
+  }, [assignmentsByStaffId, staffById, shiftsByStaffId, showAbsent]);
 
   const canEdit = mode === "admin" && !editLocked;
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
@@ -458,6 +465,14 @@ export function MapperGrid({
             {editLocked ? "ロック解除" : "ロックする"}
           </button>
           <div className="text-xs text-zinc-500">日付: {date}</div>
+          <label className="ml-2 inline-flex items-center gap-2 text-sm text-zinc-600">
+            <input
+              type="checkbox"
+              checked={showAbsent}
+              onChange={(e) => setShowAbsent(e.target.checked)}
+            />
+            欠勤/休みも表示
+          </label>
           {selectedStaffId ? (
             <div className="ml-auto flex flex-wrap items-center gap-2">
               <div className="text-sm text-zinc-600">

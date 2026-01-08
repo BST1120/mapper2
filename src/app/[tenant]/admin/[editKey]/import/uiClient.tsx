@@ -85,9 +85,10 @@ function parseCode(raw: string) {
   if (!v) return { kind: "empty" as const };
   const upper = toHalfWidthAscii(v).toUpperCase().replace(/\s+/g, "");
   // 欠勤
-  if (["欠", "欠勤"].includes(upper)) return { kind: "absent" as const };
+  if (["欠", "欠勤", "休", "休み", "年休", "研"].includes(upper))
+    return { kind: "absent" as const };
   // common off markers
-  if (["-", "休", "休み", "OFF"].includes(upper)) return { kind: "empty" as const };
+  if (["-", "OFF"].includes(upper)) return { kind: "empty" as const };
   // 勤務コード（A〜Z + 数字）例: D1 / D１ / g1 / G1
   const m = upper.match(/^([A-Z])([0-9]*)$/);
   if (m) return { kind: "code" as const, code: `${m[1]}${m[2]}` };
