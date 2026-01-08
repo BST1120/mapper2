@@ -22,6 +22,8 @@ export function AdminStaffClient() {
   const [firstInitial, setFirstInitial] = useState("");
   const [breakPattern, setBreakPattern] = useState<Staff["breakPattern"]>("30_30");
   const [shiftCodeDefault, setShiftCodeDefault] = useState("C");
+  const [showOnMapper, setShowOnMapper] = useState(true);
+  const [showOnTimeline, setShowOnTimeline] = useState(true);
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -79,6 +81,14 @@ export function AdminStaffClient() {
               ))}
             </select>
           </label>
+          <label className="flex items-center gap-2 text-sm text-zinc-700">
+            <input type="checkbox" checked={showOnMapper} onChange={(e) => setShowOnMapper(e.target.checked)} />
+            マッパーに表示
+          </label>
+          <label className="flex items-center gap-2 text-sm text-zinc-700">
+            <input type="checkbox" checked={showOnTimeline} onChange={(e) => setShowOnTimeline(e.target.checked)} />
+            タイムバーに表示
+          </label>
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
@@ -98,6 +108,8 @@ export function AdminStaffClient() {
                   active: true,
                   breakPattern,
                   shiftCodeDefault,
+                  showOnMapper,
+                  showOnTimeline,
                   createdAt: serverTimestamp() as unknown,
                   updatedAt: serverTimestamp() as unknown,
                 };
@@ -128,6 +140,7 @@ export function AdminStaffClient() {
                 <th className="p-2 text-left">表示名</th>
                 <th className="p-2 text-left">勤務形態</th>
                 <th className="p-2 text-left">休憩</th>
+                <th className="p-2 text-left">表示</th>
               </tr>
             </thead>
             <tbody>
@@ -170,6 +183,36 @@ export function AdminStaffClient() {
                       <option value="15_30">15+30</option>
                       <option value="30_30">30+30</option>
                     </select>
+                  </td>
+                  <td className="p-2">
+                    <label className="mr-3 inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={staff.showOnMapper !== false}
+                        onChange={async (e) => {
+                          await setDoc(
+                            staffDocRef(tenantId, id),
+                            { showOnMapper: e.target.checked, updatedAt: serverTimestamp() as unknown },
+                            { merge: true },
+                          );
+                        }}
+                      />
+                      マッパー
+                    </label>
+                    <label className="inline-flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={staff.showOnTimeline !== false}
+                        onChange={async (e) => {
+                          await setDoc(
+                            staffDocRef(tenantId, id),
+                            { showOnTimeline: e.target.checked, updatedAt: serverTimestamp() as unknown },
+                            { merge: true },
+                          );
+                        }}
+                      />
+                      タイムバー
+                    </label>
                   </td>
                 </tr>
               ))}

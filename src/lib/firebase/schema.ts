@@ -81,6 +81,11 @@ export type Staff = {
   active: boolean;
   breakPattern: "15_30" | "30_30";
   /**
+   * マッパー/タイムバーに表示するか（例：給食・掃除などを非表示にする用途）
+   */
+  showOnMapper?: boolean;
+  showOnTimeline?: boolean;
+  /**
    * 既定の勤務形態コード（ShiftType.code）
    * 例: A, D1, K, L1 ...
    */

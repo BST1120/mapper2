@@ -14,6 +14,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  TouchSensor,
   useDraggable,
   useDroppable,
   useSensor,
@@ -216,6 +217,10 @@ export function MapperGrid({
 }: MapperGridProps) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // iPad/Safari向け
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 120, tolerance: 8 },
+    }),
   );
   const [activeStaffId, setActiveStaffId] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
@@ -228,6 +233,8 @@ export function MapperGrid({
       // その日シフトが無い職員は表示しない（当日出勤者のみ）
       if (!shift) continue;
       if (shift.absent && !showAbsent) continue;
+      const staff = staffById[staffId];
+      if (staff?.showOnMapper === false) continue;
       const a = assignmentsByStaffId[staffId];
       const areaId = a?.areaId ?? "free";
       map[areaId] ??= [];

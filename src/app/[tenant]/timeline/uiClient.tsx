@@ -52,7 +52,8 @@ export function TimelineClient() {
         const shift = shiftsByStaffId[id];
         return { id, staff: s, shift };
       })
-      .filter((x) => x.staff.active);
+      .filter((x) => x.staff.active)
+      .filter((x) => x.staff.showOnTimeline !== false);
     list.sort((a, b) =>
       buildDisplayName(a.staff).localeCompare(buildDisplayName(b.staff), "ja"),
     );
