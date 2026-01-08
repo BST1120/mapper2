@@ -219,7 +219,8 @@ export function MapperGrid({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     // iPad/Safari向け
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 120, tolerance: 8 },
+      // long-pressが苦手な場合が多いので「一定距離動かす」で開始
+      activationConstraint: { distance: 8 },
     }),
   );
   const [activeStaffId, setActiveStaffId] = useState<string | null>(null);
@@ -284,6 +285,17 @@ export function MapperGrid({
     const endAt = shift?.endAt as unknown as Timestamp | undefined;
     if (!endAt?.toDate) return false;
     return Date.now() > endAt.toDate().getTime();
+  }
+
+  function getShiftTimeLabel(staffId: string): string | null {
+    const shift = shiftsByStaffId[staffId];
+    const s = shift?.startAt as unknown as Timestamp | undefined;
+    const e = shift?.endAt as unknown as Timestamp | undefined;
+    if (!s?.toDate || !e?.toDate) return null;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const sd = s.toDate();
+    const ed = e.toDate();
+    return `${pad(sd.getHours())}:${pad(sd.getMinutes())}〜${pad(ed.getHours())}:${pad(ed.getMinutes())}`;
   }
 
   async function setAbsent(staffId: string, absent: boolean) {
@@ -487,6 +499,17 @@ export function MapperGrid({
                 <span className="font-medium">
                   {buildDisplayName(staffById[selectedStaffId]!)}
                 </span>
+                <span className="ml-2 text-xs text-zinc-500">
+                  {getShiftTimeLabel(selectedStaffId) ?? "（勤務未設定）"}
+                  {isAbsent(selectedStaffId)
+                    ? "・欠勤"
+                    : isShiftEnded(selectedStaffId)
+                      ? "・勤務終了"
+                      : "・勤務中"}
+                </span>
+              </div>
+              <div className="text-xs text-zinc-500">
+                D&Dできない時: ロック解除＋少し動かしてドラッグ（iPadは指を動かす）
               </div>
               <button
                 className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50 disabled:opacity-50"
