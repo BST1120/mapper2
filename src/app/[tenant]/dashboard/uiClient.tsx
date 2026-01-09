@@ -5,11 +5,47 @@ import { useParams, useSearchParams } from "next/navigation";
 
 import { formatDateYYYYMMDD } from "@/lib/date/today";
 import { useAreas, useAssignments, useShifts, useStaff } from "@/lib/firebase/hooks";
-import { buildDisplayName } from "@/lib/staff/displayName";
 
 function pct(used: number, total: number) {
   if (total <= 0) return "-";
   return `${Math.round((used / total) * 100)}%`;
+}
+
+type AreaSlot = { id: string; fallbackName: string; span?: number };
+
+const topRow: AreaSlot[] = [
+  { id: "saru", fallbackName: "さる" },
+  { id: "hebi", fallbackName: "へび" },
+  { id: "lunch", fallbackName: "ランチ" },
+  { id: "usagi", fallbackName: "うさぎ" },
+  { id: "tora", fallbackName: "とら" },
+  { id: "nezumi", fallbackName: "ねずみ" },
+];
+
+const midRow: AreaSlot[] = [
+  { id: "yard_older", fallbackName: "以上児園庭", span: 2 },
+  { id: "office", fallbackName: "事務室", span: 2 },
+  { id: "yard_younger", fallbackName: "未満児園庭", span: 2 },
+];
+
+const bottomRow: AreaSlot = { id: "yard", fallbackName: "園庭（広い）", span: 6 };
+
+function spanClass(span: number | undefined) {
+  switch (span) {
+    case 1:
+      return "col-span-1";
+    case 2:
+      return "col-span-2";
+    case 3:
+      return "col-span-3";
+    case 4:
+      return "col-span-4";
+    case 5:
+      return "col-span-5";
+    case 6:
+    default:
+      return "col-span-6";
+  }
 }
 
 export function DashboardClient() {
@@ -62,31 +98,16 @@ export function DashboardClient() {
       counts[areaId] = (counts[areaId] ?? 0) + 1;
     }
 
-    // Sort areas by configured order; always show free/break at end.
-    const orderedAreas = Object.entries(areasById)
-      .map(([id, a]) => ({ id, name: a.name, order: a.order, type: a.type }))
-      .sort((a, b) => a.order - b.order);
-
-    const rows = [
-      ...orderedAreas.map((a) => ({
-        id: a.id,
-        name: a.name,
-        count: counts[a.id] ?? 0,
-      })),
-      { id: "free", name: "フリー", count: counts["free"] ?? 0 },
-      { id: "break", name: "休憩", count: counts["break"] ?? 0 },
-    ];
+    const areaName = (areaId: string, fallback: string) =>
+      areasById[areaId]?.name ?? fallback;
 
     return {
       date,
       totalPresent,
       breakRate: pct(breakUsed, breakTotal),
       onBreak,
-      rows,
-      presentNames: presentIds
-        .map((id) => staffById[id])
-        .filter(Boolean)
-        .map((s) => buildDisplayName(s!)),
+      counts,
+      areaName,
     };
   }, [areasById, staffById, assignmentsByStaffId, shiftsByStaffId, date]);
 
@@ -113,13 +134,84 @@ export function DashboardClient() {
 
       <div className="rounded-xl border bg-white p-4">
         <div className="text-sm font-medium">エリア別人数（{computed.date}）</div>
-        <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {computed.rows.map((r) => (
-            <div key={r.id} className="rounded-lg border bg-zinc-50 px-3 py-2">
-              <div className="text-sm text-zinc-700">{r.name}</div>
-              <div className="text-xl font-semibold">{r.count}名</div>
+        <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_320px]">
+          <div className="rounded-2xl border bg-zinc-50 p-3">
+            <div className="grid grid-cols-6 gap-3">
+              {topRow.map((slot) => {
+                const c = computed.counts[slot.id] ?? 0;
+                return (
+                  <div key={slot.id} className="col-span-1">
+                    <div
+                      className={[
+                        "rounded-xl border p-3",
+                        c > 0 ? "bg-orange-50 border-orange-200" : "bg-zinc-100 border-zinc-200",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{computed.areaName(slot.id, slot.fallbackName)}</div>
+                        <div className="text-xs text-zinc-500">{c}名</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {midRow.map((slot) => {
+                const c = computed.counts[slot.id] ?? 0;
+                return (
+                  <div key={slot.id} className={spanClass(slot.span)}>
+                    <div
+                      className={[
+                        "rounded-xl border p-3",
+                        c > 0 ? "bg-orange-50 border-orange-200" : "bg-zinc-100 border-zinc-200",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{computed.areaName(slot.id, slot.fallbackName)}</div>
+                        <div className="text-xs text-zinc-500">{c}名</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {(() => {
+                const c = computed.counts[bottomRow.id] ?? 0;
+                return (
+                  <div className={spanClass(bottomRow.span)}>
+                    <div
+                      className={[
+                        "rounded-xl border p-3",
+                        c > 0 ? "bg-orange-50 border-orange-200" : "bg-zinc-100 border-zinc-200",
+                      ].join(" ")}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium">{computed.areaName(bottomRow.id, bottomRow.fallbackName)}</div>
+                        <div className="text-xs text-zinc-500">{c}名</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
-          ))}
+          </div>
+
+          <div className="space-y-3">
+            {[
+              { id: "free", fallbackName: "フリー" },
+              { id: "break", fallbackName: "休憩" },
+            ].map((slot) => {
+              const c = computed.counts[slot.id] ?? 0;
+              return (
+                <div key={slot.id} className="rounded-xl border bg-white p-3">
+                  <div className="flex items-center justify-between">
+                    <div className="font-medium">{computed.areaName(slot.id, slot.fallbackName)}</div>
+                    <div className="text-xs text-zinc-500">{c}名</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     </div>
