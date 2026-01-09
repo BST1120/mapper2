@@ -261,6 +261,21 @@ export function MapperGrid({
   const [showAbsent, setShowAbsent] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
 
+  const attendance = useMemo(() => {
+    // "総出勤" = shiftsがある & マッパー表示対象（給食/掃除を除外） & active
+    let present = 0;
+    let absent = 0;
+    for (const [staffId, shift] of Object.entries(shiftsByStaffId)) {
+      const staff = staffById[staffId];
+      if (!staff) continue;
+      if (staff.active === false) continue;
+      if (staff.showOnMapper === false) continue;
+      if (shift?.absent) absent += 1;
+      else present += 1;
+    }
+    return { present, absent, total: present + absent };
+  }, [shiftsByStaffId, staffById]);
+
   const staffByAreaId = useMemo(() => {
     const map: Record<string, string[]> = {};
     for (const [staffId] of Object.entries(staffById)) {
@@ -607,6 +622,13 @@ export function MapperGrid({
               </span>
             ) : null}
           </div>
+          <div className="text-sm text-zinc-600">
+            総出勤:{" "}
+            <span className="font-medium">{attendance.present}名</span>
+            {attendance.absent > 0 ? (
+              <span className="ml-1 text-xs text-zinc-500">（欠{attendance.absent}）</span>
+            ) : null}
+          </div>
           <button
             className="rounded-full border bg-white px-3 py-1 text-sm hover:bg-zinc-50"
             onClick={() => toggleLock(!editLocked)}
@@ -725,7 +747,13 @@ export function MapperGrid({
       ) : (
         <div className="rounded-xl border bg-zinc-50 p-3 text-sm text-zinc-700">
           ここは<strong>閲覧モード</strong>です（移動・休憩操作はできません）。編集は<strong>管理者用URL</strong>で行ってください。
-          <div className="mt-1 text-xs text-zinc-500">日付: {date}</div>
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-zinc-500">
+            <span>日付: {date}</span>
+            <span>
+              総出勤: <span className="font-medium">{attendance.present}名</span>
+              {attendance.absent > 0 ? `（欠${attendance.absent}）` : ""}
+            </span>
+          </div>
         </div>
       )}
 
