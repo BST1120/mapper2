@@ -6,8 +6,9 @@ import { deleteDoc, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 
 import { formatDateYYYYMMDD } from "@/lib/date/today";
 import { bootstrapTenantAndAreas, seedSampleStaff } from "@/lib/firebase/bootstrap";
+import { DEFAULT_AREAS } from "@/lib/defaults/areas";
 import { DEFAULT_SHIFT_TYPES } from "@/lib/defaults/shiftTypes";
-import { shiftTypeDocRef, tenantDocRef } from "@/lib/firebase/refs";
+import { areaDocRef, shiftTypeDocRef, tenantDocRef } from "@/lib/firebase/refs";
 import { useShiftTypes } from "@/lib/firebase/hooks";
 import type { ShiftType } from "@/lib/firebase/schema";
 import { ensureAnonymousAuth } from "@/lib/firebase/client";
@@ -109,6 +110,39 @@ export function AdminSettingsClient() {
         {status ? (
           <span className="text-sm text-zinc-700">{status}</span>
         ) : null}
+      </div>
+
+      <div className="mt-6 border-t pt-4">
+        <div className="text-sm font-medium">エリア</div>
+        <div className="mt-1 text-sm text-zinc-600">
+          画面レイアウトで使うエリア（裏庭/ビオトープ/園外 など）を Firestore に作成/更新します。
+        </div>
+        <div className="mt-3">
+          <button
+            className="rounded-lg border bg-white px-4 py-2 text-sm font-medium hover:bg-zinc-50 disabled:opacity-50"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setStatus("");
+              try {
+                const store = tenantDocRef(tenantId).firestore;
+                const batch = writeBatch(store);
+                for (const a of DEFAULT_AREAS) {
+                  batch.set(areaDocRef(tenantId, a.areaId), a.area, { merge: true });
+                }
+                await batch.commit();
+                setStatus(`エリアを作成/更新しました（${DEFAULT_AREAS.length}件）。`);
+              } catch (e: unknown) {
+                setStatus(e instanceof Error ? e.message : "Failed to seed areas.");
+              } finally {
+                setBusy(false);
+              }
+            }}
+            type="button"
+          >
+            エリアを作成/更新
+          </button>
+        </div>
       </div>
 
       <div className="mt-6 border-t pt-4">

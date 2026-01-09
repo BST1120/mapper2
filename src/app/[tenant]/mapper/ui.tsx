@@ -53,7 +53,11 @@ const midRow: AreaSlot[] = [
   { id: "yard_younger", fallbackName: "未満児園庭", span: 2 },
 ];
 
-const bottomRow: AreaSlot = { id: "yard", fallbackName: "園庭（広い）", span: 6 };
+const bottomRow: AreaSlot[] = [
+  { id: "backyard", fallbackName: "裏庭", span: 2 },
+  { id: "biotope", fallbackName: "ビオトープ", span: 2 },
+  { id: "yard", fallbackName: "園庭", span: 2 },
+];
 
 function spanClass(span: number | undefined) {
   switch (span) {
@@ -726,9 +730,12 @@ export function MapperGrid({
                       {areaNameFrom(areasById ?? null, s)}
                     </option>
                   ))}
-                  <option value={bottomRow.id}>
-                    {areaNameFrom(areasById ?? null, bottomRow)}
-                  </option>
+                  {bottomRow.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {areaNameFrom(areasById ?? null, s)}
+                    </option>
+                  ))}
+                  <option value="offsite">{areaNameFrom(areasById ?? null, { id: "offsite", fallbackName: "園外" })}</option>
                 </select>
                 <span className="text-xs text-zinc-500">選ぶと即移動</span>
               </label>
@@ -895,38 +902,40 @@ export function MapperGrid({
                 </div>
               ))}
 
-              <div className={spanClass(bottomRow.span)}>
-                <DroppableArea
-                  areaId={bottomRow.id}
-                  title={areaNameFrom(areasById ?? null, bottomRow)}
-                  count={(staffByAreaId[bottomRow.id] ?? []).length}
-                  countLabel={countLabelFor(bottomRow.id)}
-                  disabled={!canEdit}
-                  size="lg"
-                  tone="room"
-                  highlight={(staffByAreaId[bottomRow.id] ?? []).length > 0}
-                  onClick={
-                    canEdit && selectedStaffId && !isDragging
-                      ? () => void moveStaff(selectedStaffId, bottomRow.id)
-                      : undefined
-                  }
-                >
-                  {(staffByAreaId[bottomRow.id] ?? []).map((staffId) => (
-                    <DraggableStaff
-                      key={staffId}
-                      staffId={staffId}
-                      staff={staffById[staffId]!}
-                      enabled={canEdit && !isAbsent(staffId)}
-                      badge={getChipBadge(staffId)}
-                      chipClassName={[
-                        isShiftEnded(staffId) ? "opacity-40 grayscale" : "",
-                        isAbsent(staffId) ? "opacity-40 grayscale" : "",
-                      ].join(" ")}
-                      onClick={() => canEdit && setSelectedStaffId(staffId)}
-                    />
-                  ))}
-                </DroppableArea>
-              </div>
+              {bottomRow.map((slot) => (
+                <div key={slot.id} className={spanClass(slot.span)}>
+                  <DroppableArea
+                    areaId={slot.id}
+                    title={areaNameFrom(areasById ?? null, slot)}
+                    count={(staffByAreaId[slot.id] ?? []).length}
+                    countLabel={countLabelFor(slot.id)}
+                    disabled={!canEdit}
+                    size="lg"
+                    tone="room"
+                    highlight={(staffByAreaId[slot.id] ?? []).length > 0}
+                    onClick={
+                      canEdit && selectedStaffId && !isDragging
+                        ? () => void moveStaff(selectedStaffId, slot.id)
+                        : undefined
+                    }
+                  >
+                    {(staffByAreaId[slot.id] ?? []).map((staffId) => (
+                      <DraggableStaff
+                        key={staffId}
+                        staffId={staffId}
+                        staff={staffById[staffId]!}
+                        enabled={canEdit && !isAbsent(staffId)}
+                        badge={getChipBadge(staffId)}
+                        chipClassName={[
+                          isShiftEnded(staffId) ? "opacity-40 grayscale" : "",
+                          isAbsent(staffId) ? "opacity-40 grayscale" : "",
+                        ].join(" ")}
+                        onClick={() => canEdit && setSelectedStaffId(staffId)}
+                      />
+                    ))}
+                  </DroppableArea>
+                </div>
+              ))}
             </div>
 
           </div>
@@ -978,6 +987,36 @@ export function MapperGrid({
               }
             >
               {(staffByAreaId["break"] ?? []).map((staffId) => (
+                <DraggableStaff
+                  key={staffId}
+                  staffId={staffId}
+                  staff={staffById[staffId]!}
+                  enabled={canEdit && !isAbsent(staffId)}
+                  badge={getChipBadge(staffId)}
+                  chipClassName={[
+                    isShiftEnded(staffId) ? "opacity-40 grayscale" : "",
+                    isAbsent(staffId) ? "opacity-40 grayscale" : "",
+                  ].join(" ")}
+                  onClick={() => canEdit && setSelectedStaffId(staffId)}
+                />
+              ))}
+            </DroppableArea>
+
+            <DroppableArea
+              areaId="offsite"
+              title="園外"
+              count={(staffByAreaId["offsite"] ?? []).length}
+              countLabel={countLabelFor("offsite")}
+              disabled={!canEdit}
+              size="xl"
+              tone="pool"
+              onClick={
+                canEdit && selectedStaffId && !isDragging
+                  ? () => void moveStaff(selectedStaffId, "offsite")
+                  : undefined
+              }
+            >
+              {(staffByAreaId["offsite"] ?? []).map((staffId) => (
                 <DraggableStaff
                   key={staffId}
                   staffId={staffId}

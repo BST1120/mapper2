@@ -38,7 +38,11 @@ const midRow: AreaSlot[] = [
   { id: "yard_younger", fallbackName: "未満児園庭", span: 2 },
 ];
 
-const bottomRow: AreaSlot = { id: "yard", fallbackName: "園庭（広い）", span: 6 };
+const bottomRow: AreaSlot[] = [
+  { id: "backyard", fallbackName: "裏庭", span: 2 },
+  { id: "biotope", fallbackName: "ビオトープ", span: 2 },
+  { id: "yard", fallbackName: "園庭", span: 2 },
+];
 
 function spanClass(span: number | undefined) {
   switch (span) {
@@ -221,10 +225,10 @@ export function DashboardClient() {
                 );
               })}
 
-              {(() => {
-                const c = computed.counts[bottomRow.id] ?? 0;
+              {bottomRow.map((slot) => {
+                const c = computed.counts[slot.id] ?? 0;
                 return (
-                  <div className={spanClass(bottomRow.span)}>
+                  <div key={`cell-${slot.id}`} className={spanClass(slot.span)}>
                     <div
                       className={[
                         "rounded-xl border p-3",
@@ -232,13 +236,13 @@ export function DashboardClient() {
                       ].join(" ")}
                     >
                       <div className="flex items-center justify-between">
-                        <div className="font-medium">{computed.areaName(bottomRow.id, bottomRow.fallbackName)}</div>
+                        <div className="font-medium">{computed.areaName(slot.id, slot.fallbackName)}</div>
                         <div className="text-xs text-zinc-500">{c}名</div>
                       </div>
                     </div>
                   </div>
                 );
-              })()}
+              })}
             </div>
           </div>
 
@@ -246,6 +250,7 @@ export function DashboardClient() {
             {[
               { id: "free", fallbackName: "フリー" },
               { id: "break", fallbackName: "休憩" },
+              { id: "offsite", fallbackName: "園外" },
             ].map((slot) => {
               const c = computed.counts[slot.id] ?? 0;
               return (
