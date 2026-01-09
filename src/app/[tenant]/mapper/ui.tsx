@@ -86,9 +86,17 @@ type MapperGridProps = {
 
 function StaffChip({ staff, badge }: { staff: Staff; badge?: string | null }) {
   const name = buildDisplayName(staff);
+  const nameLen = name.length;
+  const nameSizeClass =
+    nameLen >= 5 ? "text-[10px]" : nameLen >= 3 ? "text-[11px]" : "text-xs";
   return (
     <div className={["relative rounded-lg border bg-white px-2 py-1 text-center text-xs", badge ? "pr-7" : ""].join(" ")}>
-      <div className="overflow-hidden text-ellipsis whitespace-nowrap font-medium leading-4">
+      <div
+        className={[
+          "overflow-hidden text-ellipsis whitespace-nowrap font-medium leading-4",
+          nameSizeClass,
+        ].join(" ")}
+      >
         {name}
       </div>
       {badge ? (
@@ -144,16 +152,11 @@ function DraggableStaff({
       }
     : undefined;
 
-  const nameLen = buildDisplayName(staff).length;
-  const spanClassName =
-    nameLen >= 6 ? "col-span-3" : nameLen >= 3 ? "col-span-2" : "col-span-1";
-
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={[
-        spanClassName,
         enabled ? "cursor-grab active:cursor-grabbing touch-none" : "",
         isDragging ? "opacity-40" : "",
       ].join(" ")}
