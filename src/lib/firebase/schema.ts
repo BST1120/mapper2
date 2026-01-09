@@ -38,6 +38,10 @@ export type DayState = {
   editLocked: boolean;
   lockedAt?: unknown;
   lockedByUid?: string;
+  /**
+   * 当日の共有メモ（マッパー右側に表示）
+   */
+  memo?: string;
 };
 
 export type AuditLog = {

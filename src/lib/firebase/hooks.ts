@@ -142,10 +142,11 @@ export function useDayState(tenantId: string, date: string) {
           setDoc(ref, { editLocked: false } satisfies DayState, {
             merge: true,
           });
-          setState({ editLocked: false });
+          setState({ editLocked: false, memo: "" });
           return;
         }
-        setState((snap.data() as DayState) ?? { editLocked: false });
+        const d = (snap.data() as DayState) ?? { editLocked: false };
+        setState({ editLocked: d.editLocked, lockedAt: d.lockedAt, lockedByUid: d.lockedByUid, memo: d.memo ?? "" });
       },
       (e) =>
         setError(e instanceof Error ? e.message : "Failed to load day state"),

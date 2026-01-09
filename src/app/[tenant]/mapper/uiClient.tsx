@@ -34,6 +34,7 @@ export function MapperPageClient({ fallback }: { fallback: React.ReactNode }) {
       assignmentsByStaffId={assignmentsByStaffId}
       shiftsByStaffId={shiftsByStaffId}
       editLocked={state.editLocked}
+      memo={state.memo ?? ""}
     />
   );
 }

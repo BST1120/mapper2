@@ -25,7 +25,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   addDoc,
   getDoc,
@@ -82,6 +82,7 @@ type MapperGridProps = {
   assignmentsByStaffId: Record<string, Assignment>;
   shiftsByStaffId: Record<string, Shift>;
   editLocked: boolean;
+  memo: string;
 };
 
 function StaffChip({ staff, badge }: { staff: Staff; badge?: string | null }) {
@@ -264,6 +265,7 @@ export function MapperGrid({
   assignmentsByStaffId,
   shiftsByStaffId,
   editLocked,
+  memo,
 }: MapperGridProps) {
   const sensors = useSensors(
     // Desktop向け（iOS/AndroidはPointerEventがTouchとして来ることがあり、Sensor競合しやすい）
@@ -323,6 +325,25 @@ export function MapperGrid({
 
   const canEdit = mode === "admin" && !editLocked;
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const [memoDraft, setMemoDraft] = useState<string>(memo ?? "");
+
+  useEffect(() => {
+    setMemoDraft(memo ?? "");
+  }, [memo]);
+
+  useEffect(() => {
+    if (!canEdit) return;
+    if ((memoDraft ?? "") === (memo ?? "")) return;
+    const t = window.setTimeout(async () => {
+      try {
+        await ensureAnonymousAuth();
+        await setDoc(dayStateDocRef(tenantId, date), { memo: memoDraft }, { merge: true });
+      } catch (e: unknown) {
+        setBanner(e instanceof Error ? e.message : "メモの保存に失敗しました。");
+      }
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [memoDraft, memo, canEdit, tenantId, date]);
 
   function getBreakBadge(staffId: string): string | null {
     const shift = shiftsByStaffId[staffId];
@@ -971,6 +992,27 @@ export function MapperGrid({
                 />
               ))}
             </DroppableArea>
+
+            <section className="rounded-xl border bg-white p-3">
+              <div className="flex items-center justify-between">
+                <div className="font-medium">メモ</div>
+                {!canEdit && mode === "admin" ? (
+                  <div className="text-xs text-zinc-500">※ロック中は編集できません</div>
+                ) : null}
+              </div>
+              <textarea
+                className="mt-2 w-full resize-none rounded-lg border px-2 py-2 text-sm outline-none focus:ring-2 focus:ring-emerald-200"
+                rows={6}
+                placeholder="例）13:00 ねずみへ応援1名 / 15:30 休憩回し確認…"
+                value={memoDraft}
+                onChange={(e) => setMemoDraft(e.target.value)}
+                readOnly={mode !== "admin"}
+                disabled={mode === "admin" && !canEdit}
+              />
+              <div className="mt-1 text-xs text-zinc-500">
+                {mode === "admin" ? "自動保存（500ms後）" : "（閲覧専用）"}
+              </div>
+            </section>
           </div>
 
           <DragOverlay>
