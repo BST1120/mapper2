@@ -1,15 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { Timestamp } from "firebase/firestore";
 
 import { formatDateYYYYMMDD } from "@/lib/date/today";
 import { dateAtLocal } from "@/lib/date/localTime";
-import { useAssignments, useShifts, useStaff, useTenant } from "@/lib/firebase/hooks";
+import { useAssignments, useAuditLogs, useShifts, useStaff, useTenant } from "@/lib/firebase/hooks";
 import { buildDisplayName } from "@/lib/staff/displayName";
 import { makeTimelineSlots } from "@/lib/timeline/slots";
 import { computeUnderstaffedRanges } from "@/lib/timeline/understaffed";
+import { buildStaffAreaTimelines } from "@/lib/timeline/areaTimeline";
 
 type Slot = { t: Date; label: string };
 
@@ -35,10 +36,40 @@ export function TimelineClient() {
   const { staffById, error: staffError } = useStaff(tenantId);
   const { shiftsByStaffId, error: shiftsError } = useShifts(tenantId, date);
   const { assignmentsByStaffId, error: assnError } = useAssignments(tenantId, date);
+  const { logs, error: logsError } = useAuditLogs(tenantId, date, 1000);
   const { tenant, error: tenantError } = useTenant(tenantId);
-  const error = staffError || shiftsError || assnError || tenantError;
+  const error = staffError || shiftsError || assnError || logsError || tenantError;
 
   const slots = useMemo(() => makeSlots(date), [date]);
+  const todayStr = formatDateYYYYMMDD(new Date());
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  useEffect(() => {
+    if (date !== todayStr) {
+      return;
+    }
+    // Set via callbacks (avoid setState directly in effect body).
+    const t0 = window.setTimeout(() => setNowMs(Date.now()), 0);
+    const id = window.setInterval(() => setNowMs(Date.now()), 60_000);
+    return () => {
+      window.clearTimeout(t0);
+      window.clearInterval(id);
+    };
+  }, [date, todayStr]);
+
+  const nowSlotIdx = useMemo(() => {
+    if (date !== todayStr) return null;
+    if (nowMs == null) return null;
+    const start = dateAtLocal(date, "07:00").getTime();
+    const end = dateAtLocal(date, "19:00").getTime();
+    if (nowMs < start || nowMs > end) return null;
+    // find last slot <= now (ignore last label slot for marker)
+    let idx = 0;
+    for (let i = 0; i < slots.length - 1; i++) {
+      if (slots[i]!.t.getTime() <= nowMs) idx = i;
+      else break;
+    }
+    return idx;
+  }, [date, todayStr, slots, nowMs]);
 
   const rows = useMemo(() => {
     if (!staffById || !shiftsByStaffId) return null;
@@ -55,17 +86,37 @@ export function TimelineClient() {
     return list;
   }, [staffById, shiftsByStaffId]);
 
-  const counts = useMemo(() => {
+  const areaTimelines = useMemo(() => {
     if (!rows || !assignmentsByStaffId) return null;
+    const staffIds = rows.map((r) => r.id);
+    return buildStaffAreaTimelines({ staffIds, assignmentsByStaffId, logs });
+  }, [rows, assignmentsByStaffId, logs]);
+
+  const counts = useMemo(() => {
+    if (!rows || !assignmentsByStaffId || !areaTimelines) return null;
     const arr: number[] = [];
+    const trackers = rows.map((r) => {
+      const tl = areaTimelines[r.id]!;
+      return {
+        id: r.id,
+        shift: r.shift,
+        areaId: tl.initialAreaId,
+        moves: tl.moves,
+        moveIdx: 0,
+      };
+    });
     for (let i = 0; i < slots.length; i++) {
       const tMs = slots[i]!.t.getTime();
       let c = 0;
-      for (const r of rows) {
-        // 事務室の職員は「現場人数」カウントから除外
-        const areaId = assignmentsByStaffId[r.id]?.areaId ?? "free";
-        if (areaId === "office") continue;
-        const sh = r.shift;
+      for (const tr of trackers) {
+        // advance area timeline up to this slot
+        while (tr.moveIdx < tr.moves.length && tr.moves[tr.moveIdx]!.ms <= tMs) {
+          tr.areaId = tr.moves[tr.moveIdx]!.toAreaId;
+          tr.moveIdx += 1;
+        }
+        // 事務室の職員は「その時間帯だけ」現場人数から除外
+        if (tr.areaId === "office") continue;
+        const sh = tr.shift;
         if (!sh || sh.absent) continue;
         const sMs = toMs(sh.startAt);
         const eMs = toMs(sh.endAt);
@@ -75,7 +126,7 @@ export function TimelineClient() {
       arr.push(c);
     }
     return arr;
-  }, [rows, slots, assignmentsByStaffId]);
+  }, [rows, slots, assignmentsByStaffId, areaTimelines]);
 
   const threshold = tenant?.minStaffThreshold ?? 0;
   const understaffed = useMemo(() => {
@@ -84,7 +135,7 @@ export function TimelineClient() {
   }, [counts, slots, threshold]);
 
   if (error) return <div className="text-sm text-red-600">{error}</div>;
-  if (!rows || !counts || !assignmentsByStaffId)
+  if (!rows || !counts || !assignmentsByStaffId || !areaTimelines)
     return <div className="rounded-xl border bg-white p-4 text-sm text-zinc-600">読み込み中…</div>;
 
   const max = Math.max(...counts, 1);
@@ -124,8 +175,15 @@ export function TimelineClient() {
             <div className="mt-2 grid grid-cols-[160px_1fr] gap-3">
               <div />
               <div className="grid grid-cols-[repeat(49,minmax(12px,1fr))] gap-1 text-[10px] text-zinc-500">
-                {slots.map((s) => (
-                  <div key={s.label}>{s.label.endsWith(":00") ? s.label : ""}</div>
+                {slots.map((s, i) => (
+                  <div key={s.label} className="flex flex-col items-center">
+                    <div>{s.label.endsWith(":00") ? s.label : ""}</div>
+                    {nowSlotIdx === i ? (
+                      <div className="mt-0.5 h-2 w-2 rounded-full bg-emerald-600" title="現在時刻" />
+                    ) : (
+                      <div className="mt-0.5 h-2 w-2" />
+                    )}
+                  </div>
                 ))}
               </div>
             </div>

@@ -5,9 +5,10 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Timestamp } from "firebase/firestore";
 
 import { formatDateYYYYMMDD } from "@/lib/date/today";
-import { useAreas, useAssignments, useShifts, useStaff, useTenant } from "@/lib/firebase/hooks";
+import { useAreas, useAssignments, useAuditLogs, useShifts, useStaff, useTenant } from "@/lib/firebase/hooks";
 import { makeTimelineSlots } from "@/lib/timeline/slots";
 import { computeUnderstaffedRanges, formatUnderstaffedLabel } from "@/lib/timeline/understaffed";
+import { buildStaffAreaTimelines } from "@/lib/timeline/areaTimeline";
 
 function pct(used: number, total: number) {
   if (total <= 0) return "-";
@@ -71,6 +72,7 @@ export function DashboardClient() {
   const { assignmentsByStaffId } = useAssignments(tenantId, date);
   const { shiftsByStaffId } = useShifts(tenantId, date);
   const { tenant } = useTenant(tenantId);
+  const { logs } = useAuditLogs(tenantId, date, 1000);
 
   const computed = useMemo(() => {
     if (!areasById || !staffById || !assignmentsByStaffId || !shiftsByStaffId) return null;
@@ -122,15 +124,26 @@ export function DashboardClient() {
         const threshold = tenant?.minStaffThreshold ?? 0;
         if (threshold <= 0) return "-";
         const slots = makeTimelineSlots(date);
+        const areaTimelines = buildStaffAreaTimelines({
+          staffIds: presentIds,
+          assignmentsByStaffId,
+          logs,
+        });
+        const trackers = presentIds.map((id) => {
+          const tl = areaTimelines[id]!;
+          return { id, areaId: tl.initialAreaId, moves: tl.moves, moveIdx: 0 };
+        });
         const countsBySlot: number[] = [];
         for (let i = 0; i < slots.length; i++) {
           const tMs = slots[i]!.t.getTime();
           let c = 0;
-          for (const id of presentIds) {
-            // 事務室は「現場人数」カウントから除外（タイムバーと一致させる）
-            const areaId = assignmentsByStaffId[id]?.areaId ?? "free";
-            if (areaId === "office") continue;
-            const sh = shiftsByStaffId[id]!;
+          for (const tr of trackers) {
+            while (tr.moveIdx < tr.moves.length && tr.moves[tr.moveIdx]!.ms <= tMs) {
+              tr.areaId = tr.moves[tr.moveIdx]!.toAreaId;
+              tr.moveIdx += 1;
+            }
+            if (tr.areaId === "office") continue;
+            const sh = shiftsByStaffId[tr.id]!;
             const sMs = toMs(sh.startAt);
             const eMs = toMs(sh.endAt);
             if (sMs == null || eMs == null) continue;
@@ -142,7 +155,7 @@ export function DashboardClient() {
         return formatUnderstaffedLabel(ranges, 2);
       })(),
     };
-  }, [areasById, staffById, assignmentsByStaffId, shiftsByStaffId, date, tenant?.minStaffThreshold]);
+  }, [areasById, staffById, assignmentsByStaffId, shiftsByStaffId, date, tenant?.minStaffThreshold, logs]);
 
   if (!areasById || !staffById || !assignmentsByStaffId || !shiftsByStaffId) {
     return <div className="rounded-xl border bg-white p-4 text-sm text-zinc-600">読み込み中…</div>;
