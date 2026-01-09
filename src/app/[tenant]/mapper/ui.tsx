@@ -88,7 +88,9 @@ function StaffChip({ staff, badge }: { staff: Staff; badge?: string | null }) {
   const name = buildDisplayName(staff);
   return (
     <div className={["relative rounded-lg border bg-white px-2 py-1 text-center text-xs", badge ? "pr-7" : ""].join(" ")}>
-      <div className="font-medium leading-4">{name}</div>
+      <div className="overflow-hidden text-ellipsis whitespace-nowrap font-medium leading-4">
+        {name}
+      </div>
       {badge ? (
         <div className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-white">
           {badge}
@@ -142,11 +144,16 @@ function DraggableStaff({
       }
     : undefined;
 
+  const nameLen = buildDisplayName(staff).length;
+  const spanClassName =
+    nameLen >= 6 ? "col-span-3" : nameLen >= 3 ? "col-span-2" : "col-span-1";
+
   return (
     <div
       ref={setNodeRef}
       style={style}
       className={[
+        spanClassName,
         enabled ? "cursor-grab active:cursor-grabbing touch-none" : "",
         isDragging ? "opacity-40" : "",
       ].join(" ")}
