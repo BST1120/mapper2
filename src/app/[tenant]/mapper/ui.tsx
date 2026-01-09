@@ -152,7 +152,7 @@ function DraggableStaff({
         <div className={["relative", chipClassName ?? ""].join(" ")}>
           <StaffChip staff={staff} />
           {badge ? (
-            <div className="absolute -top-2 -right-2 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            <div className="absolute right-1 top-1 z-10 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-white">
               {badge}
             </div>
           ) : null}
