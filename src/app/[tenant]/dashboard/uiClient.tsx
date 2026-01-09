@@ -2,13 +2,22 @@
 
 import { useMemo } from "react";
 import { useParams, useSearchParams } from "next/navigation";
+import { Timestamp } from "firebase/firestore";
 
 import { formatDateYYYYMMDD } from "@/lib/date/today";
-import { useAreas, useAssignments, useShifts, useStaff } from "@/lib/firebase/hooks";
+import { useAreas, useAssignments, useShifts, useStaff, useTenant } from "@/lib/firebase/hooks";
+import { makeTimelineSlots } from "@/lib/timeline/slots";
+import { computeUnderstaffedRanges, formatUnderstaffedLabel } from "@/lib/timeline/understaffed";
 
 function pct(used: number, total: number) {
   if (total <= 0) return "-";
   return `${Math.round((used / total) * 100)}%`;
+}
+
+function toMs(ts: unknown): number | null {
+  const t = ts as Timestamp | undefined;
+  if (!t?.toDate) return null;
+  return t.toDate().getTime();
 }
 
 type AreaSlot = { id: string; fallbackName: string; span?: number };
@@ -61,6 +70,7 @@ export function DashboardClient() {
   const { staffById } = useStaff(tenantId);
   const { assignmentsByStaffId } = useAssignments(tenantId, date);
   const { shiftsByStaffId } = useShifts(tenantId, date);
+  const { tenant } = useTenant(tenantId);
 
   const computed = useMemo(() => {
     if (!areasById || !staffById || !assignmentsByStaffId || !shiftsByStaffId) return null;
@@ -108,8 +118,28 @@ export function DashboardClient() {
       onBreak,
       counts,
       areaName,
+      understaffedLabel: (() => {
+        const threshold = tenant?.minStaffThreshold ?? 0;
+        if (threshold <= 0) return "-";
+        const slots = makeTimelineSlots(date);
+        const countsBySlot: number[] = [];
+        for (let i = 0; i < slots.length; i++) {
+          const tMs = slots[i]!.t.getTime();
+          let c = 0;
+          for (const id of presentIds) {
+            const sh = shiftsByStaffId[id]!;
+            const sMs = toMs(sh.startAt);
+            const eMs = toMs(sh.endAt);
+            if (sMs == null || eMs == null) continue;
+            if (tMs >= sMs && tMs < eMs) c += 1;
+          }
+          countsBySlot.push(c);
+        }
+        const ranges = computeUnderstaffedRanges({ slots, counts: countsBySlot, threshold });
+        return formatUnderstaffedLabel(ranges, 2);
+      })(),
     };
-  }, [areasById, staffById, assignmentsByStaffId, shiftsByStaffId, date]);
+  }, [areasById, staffById, assignmentsByStaffId, shiftsByStaffId, date, tenant?.minStaffThreshold]);
 
   if (!areasById || !staffById || !assignmentsByStaffId || !shiftsByStaffId) {
     return <div className="rounded-xl border bg-white p-4 text-sm text-zinc-600">読み込み中…</div>;
@@ -123,7 +153,7 @@ export function DashboardClient() {
           { label: "総出勤人数", value: `${computed.totalPresent}名` },
           { label: "休憩消化率", value: computed.breakRate },
           { label: "休憩中人数", value: `${computed.onBreak}名` },
-          { label: "手薄時間", value: "-" }, // タイムバー側で実装（フェーズ7）
+          { label: "手薄時間", value: computed.understaffedLabel },
         ].map((k) => (
           <div key={k.label} className="rounded-xl border bg-white p-4">
             <div className="text-sm text-zinc-600">{k.label}</div>

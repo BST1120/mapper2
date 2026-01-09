@@ -6,22 +6,15 @@ import { Timestamp } from "firebase/firestore";
 
 import { formatDateYYYYMMDD } from "@/lib/date/today";
 import { dateAtLocal } from "@/lib/date/localTime";
-import { useShifts, useStaff } from "@/lib/firebase/hooks";
+import { useShifts, useStaff, useTenant } from "@/lib/firebase/hooks";
 import { buildDisplayName } from "@/lib/staff/displayName";
+import { makeTimelineSlots } from "@/lib/timeline/slots";
+import { computeUnderstaffedRanges } from "@/lib/timeline/understaffed";
 
 type Slot = { t: Date; label: string };
 
 function makeSlots(date: string): Slot[] {
-  const out: Slot[] = [];
-  for (let h = 7; h < 19; h++) {
-    for (let m = 0; m < 60; m += 15) {
-      const hh = String(h).padStart(2, "0");
-      const mm = String(m).padStart(2, "0");
-      out.push({ t: dateAtLocal(date, `${hh}:${mm}`), label: `${hh}:${mm}` });
-    }
-  }
-  out.push({ t: dateAtLocal(date, "19:00"), label: "19:00" });
-  return out;
+  return makeTimelineSlots(date);
 }
 
 function toMs(ts: unknown): number | null {
@@ -41,7 +34,8 @@ export function TimelineClient() {
 
   const { staffById, error: staffError } = useStaff(tenantId);
   const { shiftsByStaffId, error: shiftsError } = useShifts(tenantId, date);
-  const error = staffError || shiftsError;
+  const { tenant, error: tenantError } = useTenant(tenantId);
+  const error = staffError || shiftsError || tenantError;
 
   const slots = useMemo(() => makeSlots(date), [date]);
 
@@ -79,6 +73,12 @@ export function TimelineClient() {
     return arr;
   }, [rows, slots]);
 
+  const threshold = tenant?.minStaffThreshold ?? 0;
+  const understaffed = useMemo(() => {
+    if (!counts) return [];
+    return computeUnderstaffedRanges({ slots, counts, threshold });
+  }, [counts, slots, threshold]);
+
   if (error) return <div className="text-sm text-red-600">{error}</div>;
   if (!rows || !counts)
     return <div className="rounded-xl border bg-white p-4 text-sm text-zinc-600">読み込み中…</div>;
@@ -89,6 +89,16 @@ export function TimelineClient() {
     <div className="space-y-4">
       <div className="rounded-xl border bg-white p-4">
         <div className="text-sm font-medium">人数推移（勤務中）</div>
+        <div className="mt-1 text-xs text-zinc-600">
+          手薄しきい値:{" "}
+          <span className="font-medium">{threshold > 0 ? `${threshold}名` : "（未設定）"}</span>
+          {threshold > 0 && understaffed.length > 0 ? (
+            <span className="ml-2 text-red-700">
+              手薄: {understaffed.map((r) => `${r.start}〜${r.end}`).slice(0, 2).join(" / ")}
+              {understaffed.length > 2 ? " …" : ""}
+            </span>
+          ) : null}
+        </div>
         <div className="mt-2 overflow-auto">
           <div className="min-w-[900px]">
             <div className="grid grid-cols-[160px_1fr] gap-3">
@@ -98,7 +108,10 @@ export function TimelineClient() {
                   <div
                     key={slots[i]!.label}
                     title={`${slots[i]!.label} ${c}名`}
-                    className="rounded bg-zinc-200"
+                    className={[
+                      "rounded",
+                      threshold > 0 && c < threshold ? "bg-red-300" : "bg-zinc-200",
+                    ].join(" ")}
                     style={{ height: `${Math.max(2, Math.round((c / max) * 40))}px` }}
                   />
                 ))}

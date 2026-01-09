@@ -11,6 +11,7 @@ import {
   shiftTypesColRef,
   shiftsColRef,
   staffColRef,
+  tenantDocRef,
 } from "@/lib/firebase/refs";
 import type {
   Area,
@@ -20,6 +21,7 @@ import type {
   Shift,
   ShiftType,
   Staff,
+  Tenant,
 } from "@/lib/firebase/schema";
 
 export function useAreas(tenantId: string) {
@@ -47,6 +49,25 @@ export function useAreas(tenantId: string) {
   }, [q]);
 
   return { areasById, error };
+}
+
+export function useTenant(tenantId: string) {
+  const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ref = tenantDocRef(tenantId);
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        setTenant((snap.data() as Tenant) ?? null);
+      },
+      (e) => setError(e instanceof Error ? e.message : "Failed to load tenant"),
+    );
+    return () => unsub();
+  }, [tenantId]);
+
+  return { tenant, error };
 }
 
 export function useStaff(tenantId: string) {
