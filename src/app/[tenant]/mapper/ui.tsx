@@ -90,20 +90,22 @@ function StaffChip({ staff, badge }: { staff: Staff; badge?: string | null }) {
   const nameSizeClass =
     nameLen >= 5 ? "text-[10px]" : nameLen >= 3 ? "text-[11px]" : "text-xs";
   return (
-    <div className={["relative rounded-lg border bg-white px-2 py-1 text-center text-xs", badge ? "pr-7" : ""].join(" ")}>
-      <div
-        className={[
-          "overflow-hidden text-ellipsis whitespace-nowrap font-medium leading-4",
-          nameSizeClass,
-        ].join(" ")}
-      >
-        {name}
-      </div>
-      {badge ? (
-        <div className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-white">
-          {badge}
+    <div className="rounded-lg border bg-white px-2 py-1 text-xs">
+      <div className="flex items-center gap-1">
+        <div
+          className={[
+            "min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-center font-medium leading-4",
+            nameSizeClass,
+          ].join(" ")}
+        >
+          {name}
         </div>
-      ) : null}
+        {badge ? (
+          <div className="shrink-0 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-white">
+            {badge}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
