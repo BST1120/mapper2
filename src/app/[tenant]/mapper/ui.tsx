@@ -241,7 +241,10 @@ function DroppableArea({
       </div>
       <div
         className={[
-          "mt-2 grid grid-cols-[repeat(auto-fill,minmax(52px,1fr))] gap-2",
+          // NOTE:
+          // auto-fill は横幅が広い部屋ほど列数が増え、1セルが最小幅まで縮みやすい。
+          // 52pxだと名前/バッジが潰れるので、最小幅を上げて視認性を確保する。
+          "mt-2 grid grid-cols-[repeat(auto-fill,minmax(72px,1fr))] gap-2",
           bodyHeightClass,
           "overflow-auto overscroll-contain pr-1",
         ].join(" ")}
