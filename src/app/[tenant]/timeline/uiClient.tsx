@@ -6,7 +6,7 @@ import { Timestamp } from "firebase/firestore";
 
 import { formatDateYYYYMMDD } from "@/lib/date/today";
 import { dateAtLocal } from "@/lib/date/localTime";
-import { useShifts, useStaff, useTenant } from "@/lib/firebase/hooks";
+import { useAssignments, useShifts, useStaff, useTenant } from "@/lib/firebase/hooks";
 import { buildDisplayName } from "@/lib/staff/displayName";
 import { makeTimelineSlots } from "@/lib/timeline/slots";
 import { computeUnderstaffedRanges } from "@/lib/timeline/understaffed";
@@ -34,8 +34,9 @@ export function TimelineClient() {
 
   const { staffById, error: staffError } = useStaff(tenantId);
   const { shiftsByStaffId, error: shiftsError } = useShifts(tenantId, date);
+  const { assignmentsByStaffId, error: assnError } = useAssignments(tenantId, date);
   const { tenant, error: tenantError } = useTenant(tenantId);
-  const error = staffError || shiftsError || tenantError;
+  const error = staffError || shiftsError || assnError || tenantError;
 
   const slots = useMemo(() => makeSlots(date), [date]);
 
@@ -55,12 +56,15 @@ export function TimelineClient() {
   }, [staffById, shiftsByStaffId]);
 
   const counts = useMemo(() => {
-    if (!rows) return null;
+    if (!rows || !assignmentsByStaffId) return null;
     const arr: number[] = [];
     for (let i = 0; i < slots.length; i++) {
       const tMs = slots[i]!.t.getTime();
       let c = 0;
       for (const r of rows) {
+        // 事務室の職員は「現場人数」カウントから除外
+        const areaId = assignmentsByStaffId[r.id]?.areaId ?? "free";
+        if (areaId === "office") continue;
         const sh = r.shift;
         if (!sh || sh.absent) continue;
         const sMs = toMs(sh.startAt);
@@ -71,7 +75,7 @@ export function TimelineClient() {
       arr.push(c);
     }
     return arr;
-  }, [rows, slots]);
+  }, [rows, slots, assignmentsByStaffId]);
 
   const threshold = tenant?.minStaffThreshold ?? 0;
   const understaffed = useMemo(() => {
@@ -80,7 +84,7 @@ export function TimelineClient() {
   }, [counts, slots, threshold]);
 
   if (error) return <div className="text-sm text-red-600">{error}</div>;
-  if (!rows || !counts)
+  if (!rows || !counts || !assignmentsByStaffId)
     return <div className="rounded-xl border bg-white p-4 text-sm text-zinc-600">読み込み中…</div>;
 
   const max = Math.max(...counts, 1);

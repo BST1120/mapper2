@@ -127,6 +127,9 @@ export function DashboardClient() {
           const tMs = slots[i]!.t.getTime();
           let c = 0;
           for (const id of presentIds) {
+            // 事務室は「現場人数」カウントから除外（タイムバーと一致させる）
+            const areaId = assignmentsByStaffId[id]?.areaId ?? "free";
+            if (areaId === "office") continue;
             const sh = shiftsByStaffId[id]!;
             const sMs = toMs(sh.startAt);
             const eMs = toMs(sh.endAt);
