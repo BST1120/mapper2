@@ -1,6 +1,7 @@
-import { collection, doc } from "firebase/firestore";
+import { collection, doc, type DocumentReference } from "firebase/firestore";
 
 import { getFirestoreDb } from "@/lib/firebase/client";
+import type { ShiftType } from "@/lib/firebase/schema";
 
 export function tenantDocRef(tenantId: string) {
   return doc(getFirestoreDb(), "tenants", tenantId);
@@ -53,6 +54,12 @@ export function shiftTypesColRef(tenantId: string) {
 }
 
 export function shiftTypeDocRef(tenantId: string, code: string) {
-  return doc(getFirestoreDb(), "tenants", tenantId, "shiftTypes", code);
+  return doc(
+    getFirestoreDb(),
+    "tenants",
+    tenantId,
+    "shiftTypes",
+    code,
+  ) as DocumentReference<ShiftType>;
 }
 
