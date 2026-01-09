@@ -3,10 +3,12 @@
 import { useEffect, useState } from "react";
 
 import { ensureAnonymousAuth } from "@/lib/firebase/client";
+import { useOnlineStatus } from "@/lib/net/online";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [uid, setUid] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { online } = useOnlineStatus();
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +41,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
         ) : (
           <span>Firebase: connecting…</span>
         )}
+        <span className="ml-3">
+          {online ? (
+            <span className="text-emerald-700">Network: online</span>
+          ) : (
+            <span className="text-red-700">
+              Network: offline（変更は端末内に一時保存され、復帰後に同期されます）
+            </span>
+          )}
+        </span>
       </div>
       {children}
     </div>
