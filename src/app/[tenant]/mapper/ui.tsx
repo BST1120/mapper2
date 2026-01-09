@@ -84,11 +84,16 @@ type MapperGridProps = {
   editLocked: boolean;
 };
 
-function StaffChip({ staff }: { staff: Staff }) {
+function StaffChip({ staff, badge }: { staff: Staff; badge?: string | null }) {
   const name = buildDisplayName(staff);
   return (
-    <div className="rounded-lg border bg-white px-2 py-1 text-center text-xs">
+    <div className={["relative rounded-lg border bg-white px-2 py-1 text-center text-xs", badge ? "pr-7" : ""].join(" ")}>
       <div className="font-medium leading-4">{name}</div>
+      {badge ? (
+        <div className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-white">
+          {badge}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -150,12 +155,7 @@ function DraggableStaff({
     >
       <div onClick={onClick} className="select-none">
         <div className={["relative", chipClassName ?? ""].join(" ")}>
-          <StaffChip staff={staff} />
-          {badge ? (
-            <div className="absolute right-1 top-1 z-10 rounded-full bg-zinc-800 px-1.5 py-0.5 text-[10px] font-medium text-white">
-              {badge}
-            </div>
-          ) : null}
+          <StaffChip staff={staff} badge={badge} />
         </div>
       </div>
     </div>
