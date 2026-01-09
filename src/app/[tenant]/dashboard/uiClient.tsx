@@ -140,7 +140,7 @@ export function DashboardClient() {
               {topRow.map((slot) => {
                 const c = computed.counts[slot.id] ?? 0;
                 return (
-                  <div key={slot.id} className="col-span-1">
+                  <div key={`cell-${slot.id}`} className="col-span-1">
                     <div
                       className={[
                         "rounded-xl border p-3",
@@ -159,7 +159,7 @@ export function DashboardClient() {
               {midRow.map((slot) => {
                 const c = computed.counts[slot.id] ?? 0;
                 return (
-                  <div key={slot.id} className={spanClass(slot.span)}>
+                  <div key={`cell-${slot.id}`} className={spanClass(slot.span)}>
                     <div
                       className={[
                         "rounded-xl border p-3",
@@ -203,7 +203,7 @@ export function DashboardClient() {
             ].map((slot) => {
               const c = computed.counts[slot.id] ?? 0;
               return (
-                <div key={slot.id} className="rounded-xl border bg-white p-3">
+                <div key={`side-${slot.id}`} className="rounded-xl border bg-white p-3">
                   <div className="flex items-center justify-between">
                     <div className="font-medium">{computed.areaName(slot.id, slot.fallbackName)}</div>
                     <div className="text-xs text-zinc-500">{c}名</div>
