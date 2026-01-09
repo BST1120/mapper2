@@ -801,7 +801,10 @@ export function MapperGrid({
                     count={(staffByAreaId[slot.id] ?? []).length}
                     countLabel={countLabelFor(slot.id)}
                     disabled={!canEdit}
-                    size="sm"
+                    // 上段（さる/へび/ランチ/うさぎ/とら/ねずみ）は
+                    // デフォルトで「3人程度」が見える高さにする。
+                    // ランチは最大5人程度を想定して少し大きめ。
+                    size={slot.id === "lunch" ? "lg" : "md"}
                     tone="room"
                     highlight={(staffByAreaId[slot.id] ?? []).length > 0}
                     onClick={
