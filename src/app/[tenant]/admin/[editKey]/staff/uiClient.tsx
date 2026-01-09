@@ -117,7 +117,8 @@ export function AdminStaffClient() {
                 const staff: Staff = {
                   lastName: lastName.trim(),
                   firstName: firstName.trim(),
-                  firstInitial: init || "X",
+                  // 頭文字は任意。未入力なら苗字のみ表示にする運用。
+                  firstInitial: init,
                   active: true,
                   breakPattern,
                   shiftMode,
